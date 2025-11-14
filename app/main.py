@@ -1,12 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from dotenv import load_dotenv
-
 from .database import db_manager, get_user_by_id
-
-# Load environment variables
-load_dotenv()
 
 
 class UserResponse(BaseModel):
