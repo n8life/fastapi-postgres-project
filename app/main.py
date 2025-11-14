@@ -2,6 +2,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from .database import db_manager, get_user_by_id
+from .routers.messaging import router as messaging_router
 
 
 class UserResponse(BaseModel):
@@ -27,6 +28,9 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+
+# Include routers
+app.include_router(messaging_router)
 
 
 @app.get("/")
