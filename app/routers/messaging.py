@@ -193,7 +193,7 @@ async def update_agent_message_metadata(metadata_id: UUID, payload: AgentMessage
 # Message pulling endpoints for Feature 3
 @router.get("/agents/{agent_id}/messages", response_model=List[MessageWithRecipientInfo])
 async def get_all_messages_for_agent(agent_id: UUID):
-    """Get all messages for a specific agent (sent or received)"""
+    """Get all messages by looking up by recipient_id in message_recipients for an agent"""
     async with db_manager.get_connection() as session:
         # Verify agent exists
         agent = await session.get(Agent, agent_id)
@@ -203,17 +203,12 @@ async def get_all_messages_for_agent(agent_id: UUID):
                 detail="Agent not found"
             )
         
-        # Query for messages where agent is sender OR recipient
-        stmt = select(Message, MessageRecipient.is_read, MessageRecipient.read_at).outerjoin(
+        # Query for messages where agent is recipient (per spec: lookup by recipient_id)
+        stmt = select(Message, MessageRecipient.is_read, MessageRecipient.read_at).join(
             MessageRecipient,
             and_(
                 Message.id == MessageRecipient.message_id,
                 MessageRecipient.recipient_id == agent_id
-            )
-        ).where(
-            or_(
-                Message.sender_id == agent_id,  # Messages sent by agent
-                MessageRecipient.recipient_id == agent_id  # Messages received by agent
             )
         ).order_by(Message.sent_at.desc())
         
@@ -233,8 +228,8 @@ async def get_all_messages_for_agent(agent_id: UUID):
                 "importance": message.importance,
                 "status": message.status,
                 "msg_metadata": message.msg_metadata,
-                "is_read": is_read if message.sender_id != agent_id else None,  # Only for received messages
-                "read_at": read_at if message.sender_id != agent_id else None,
+                "is_read": is_read,  # All messages are received messages now
+                "read_at": read_at,
             }
             messages_with_info.append(MessageWithRecipientInfo(**message_dict))
         
@@ -388,13 +383,22 @@ async def mark_messages_as_read(agent_id: UUID, payload: MarkAsReadRequest):
                 detail="Agent not found"
             )
         
+        # Find message IDs to update using subquery
+        message_ids_subquery = select(MessageRecipient.message_id).join(
+            Message, Message.id == MessageRecipient.message_id
+        ).where(
+            and_(
+                MessageRecipient.recipient_id == agent_id,
+                Message.sent_at <= payload.read_up_to_date,
+                or_(MessageRecipient.is_read == False, MessageRecipient.is_read.is_(None))
+            )
+        )
+        
         # Update messages as read up to the specified date
         stmt = update(MessageRecipient).where(
             and_(
                 MessageRecipient.recipient_id == agent_id,
-                Message.id == MessageRecipient.message_id,
-                Message.sent_at <= payload.up_to_date,
-                or_(MessageRecipient.is_read == False, MessageRecipient.is_read.is_(None))
+                MessageRecipient.message_id.in_(message_ids_subquery)
             )
         ).values(
             is_read=True,

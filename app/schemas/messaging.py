@@ -141,7 +141,7 @@ class MessageMetadataWithAgent(BaseModel):
 
 class MarkAsReadRequest(BaseModel):
     """Request to mark messages as read up to a specific date"""
-    up_to_date: datetime = Field(..., description="Mark all messages as read up to this date")
+    read_up_to_date: datetime = Field(..., description="Mark all messages as read up to this date")
     model_config = ConfigDict(from_attributes=True)
 
 
