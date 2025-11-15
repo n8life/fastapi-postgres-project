@@ -18,11 +18,17 @@ A simple FastAPI application that connects to a PostgreSQL database and provides
 .
 ├── app/
 │   ├── __init__.py
-│   ├── main.py          # FastAPI application
-│   └── database.py      # Database connection and queries
+│   ├── main.py          # FastAPI application entry point
+│   ├── database.py      # Database connection and queries
+│   ├── routers/
+│   │   └── messaging.py # Message and agent API routes
+│   └── schemas/
+│       └── messaging.py # Pydantic models for messaging API
 ├── tests/
 │   ├── __init__.py
-│   └── test_api.py      # API endpoint tests
+│   ├── test_api.py                 # Core API endpoint tests
+│   ├── test_messaging_endpoints.py # Message and agent API tests
+│   └── test_message_pulling.py     # Feature 3: Pull messages tests
 ├── docker-compose.yml   # Docker services configuration
 ├── Dockerfile          # FastAPI app container
 ├── pyproject.toml      # Project dependencies (uv)
@@ -63,6 +69,12 @@ The application provides a comprehensive messaging system with the following ent
 - `POST /agent_message_metadata` - Add metadata to a message
 - `PUT /agent_message_metadata/{metadata_id}` - Update message metadata
 
+#### Message Retrieval for Agents (Feature 3)
+- `GET /agents/{agent_id}/messages` - Pull all messages for an agent (sent and received)
+- `GET /agents/{agent_id}/messages/unread` - Pull unread messages for an agent
+- `GET /messages/{message_id}/metadata/{agent_id}` - Get message metadata with agent information
+- `PUT /agents/{agent_id}/messages/mark-read` - Mark messages as read up to a given date
+
 #### API Examples
 
 **Create an Agent:**
@@ -86,6 +98,23 @@ curl -X POST http://localhost:8000/messages \
     "message_type": "text",
     "importance": 5
   }'
+```
+
+**Pull Messages for an Agent:**
+```bash
+# Get all messages for an agent (sent and received)
+curl -X GET http://localhost:8000/agents/{agent_id}/messages
+
+# Get only unread messages for an agent
+curl -X GET http://localhost:8000/agents/{agent_id}/messages/unread
+
+# Get message metadata with agent access control
+curl -X GET http://localhost:8000/messages/{message_id}/metadata/{agent_id}
+
+# Mark messages as read up to a specific date
+curl -X PUT http://localhost:8000/agents/{agent_id}/messages/mark-read \
+  -H "Content-Type: application/json" \
+  -d '{"read_up_to_date": "2024-01-01T12:00:00Z"}'
 ```
 
 **Message Threading:**
@@ -149,7 +178,7 @@ Messages support threading via `parent_message_id` and conversation grouping via
 
 3. **Set environment variables:**
    ```bash
-   export DATABASE_URL="postgresql://postgres:password@localhost:5432/testdb"
+   export DATABASE_URL="postgresql+asyncpg://postgres:password@localhost:5432/testdb"
    ```
 
 4. **Run the application:**
@@ -193,8 +222,8 @@ The application creates these sample users:
 
 ## Environment Variables
 
-- `DATABASE_URL`: PostgreSQL connection string
-  - Default: `postgresql://postgres:password@localhost:5432/testdb`
+- `DATABASE_URL`: PostgreSQL connection string (uses asyncpg driver)
+  - Default: `postgresql+asyncpg://postgres:password@localhost:5432/testdb`
 
 ## Security Features
 
@@ -202,6 +231,9 @@ The application creates these sample users:
 - Connection pooling to prevent connection exhaustion
 - Input validation with Pydantic models
 - Proper error handling and HTTP status codes
+- **Agent isolation**: Agents can only access their own messages (sender/recipient)
+- **Access control**: Message metadata endpoints verify agent access permissions
+- **Data privacy**: No endpoint allows accessing multiple agents' information simultaneously
 
 ## Development
 
