@@ -1,6 +1,10 @@
 from uuid import UUID
+from typing import List
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, and_, or_, update
+from sqlalchemy.orm import selectinload
 
 from ..database import db_manager
 from ..schemas.messaging import (
@@ -8,6 +12,7 @@ from ..schemas.messaging import (
     MessageCreate, MessageUpdate, MessageRead,
     MessageRecipientCreate, MessageRecipientUpdate, MessageRecipientRead,
     AgentMessageMetadataCreate, AgentMessageMetadataUpdate, AgentMessageMetadataRead,
+    MessageWithRecipientInfo, MessageMetadataWithAgent, MarkAsReadRequest, MarkAsReadResponse,
 )
 from ..models.messaging import Agent, Message, MessageRecipient, AgentMessageMetadata
 
@@ -183,3 +188,229 @@ async def update_agent_message_metadata(metadata_id: UUID, payload: AgentMessage
         await session.commit()
         await session.refresh(metadata)
         return metadata
+
+
+# Message pulling endpoints for Feature 3
+@router.get("/agents/{agent_id}/messages", response_model=List[MessageWithRecipientInfo])
+async def get_all_messages_for_agent(agent_id: UUID):
+    """Get all messages by looking up by recipient_id in message_recipients for an agent"""
+    async with db_manager.get_connection() as session:
+        # Verify agent exists
+        agent = await session.get(Agent, agent_id)
+        if not agent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Agent not found"
+            )
+        
+        # Query for messages where agent is recipient (per spec: lookup by recipient_id)
+        stmt = select(Message, MessageRecipient.is_read, MessageRecipient.read_at).join(
+            MessageRecipient,
+            and_(
+                Message.id == MessageRecipient.message_id,
+                MessageRecipient.recipient_id == agent_id
+            )
+        ).order_by(Message.sent_at.desc())
+        
+        result = await session.execute(stmt)
+        messages_data = result.all()
+        
+        messages_with_info = []
+        for message, is_read, read_at in messages_data:
+            message_dict = {
+                "id": message.id,
+                "sender_id": message.sender_id,
+                "sent_at": message.sent_at,
+                "parent_message_id": message.parent_message_id,
+                "conversation_id": message.conversation_id,
+                "content": message.content,
+                "message_type": message.message_type,
+                "importance": message.importance,
+                "status": message.status,
+                "msg_metadata": message.msg_metadata,
+                "is_read": is_read,  # All messages are received messages now
+                "read_at": read_at,
+            }
+            messages_with_info.append(MessageWithRecipientInfo(**message_dict))
+        
+        return messages_with_info
+
+
+@router.get("/agents/{agent_id}/messages/unread", response_model=List[MessageWithRecipientInfo])
+async def get_unread_messages_for_agent(agent_id: UUID):
+    """Get all unread messages for a specific agent"""
+    async with db_manager.get_connection() as session:
+        # Verify agent exists
+        agent = await session.get(Agent, agent_id)
+        if not agent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Agent not found"
+            )
+        
+        # Query for unread messages where agent is recipient
+        stmt = select(Message, MessageRecipient.is_read, MessageRecipient.read_at).join(
+            MessageRecipient,
+            and_(
+                Message.id == MessageRecipient.message_id,
+                MessageRecipient.recipient_id == agent_id
+            )
+        ).where(
+            and_(
+                MessageRecipient.recipient_id == agent_id,
+                or_(MessageRecipient.is_read == False, MessageRecipient.is_read.is_(None))
+            )
+        ).order_by(Message.sent_at.desc())
+        
+        result = await session.execute(stmt)
+        messages_data = result.all()
+        
+        messages_with_info = []
+        for message, is_read, read_at in messages_data:
+            message_dict = {
+                "id": message.id,
+                "sender_id": message.sender_id,
+                "sent_at": message.sent_at,
+                "parent_message_id": message.parent_message_id,
+                "conversation_id": message.conversation_id,
+                "content": message.content,
+                "message_type": message.message_type,
+                "importance": message.importance,
+                "status": message.status,
+                "msg_metadata": message.msg_metadata,
+                "is_read": is_read,
+                "read_at": read_at,
+            }
+            messages_with_info.append(MessageWithRecipientInfo(**message_dict))
+        
+        return messages_with_info
+
+
+@router.get("/messages/{message_id}/metadata/{agent_id}", response_model=MessageMetadataWithAgent)
+async def get_message_metadata_with_agent(message_id: UUID, agent_id: UUID):
+    """Get message metadata and agent info - agent can only access their own messages"""
+    async with db_manager.get_connection() as session:
+        # Verify agent exists
+        agent = await session.get(Agent, agent_id)
+        if not agent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Agent not found"
+            )
+        
+        # Get message and verify agent has access (sender or recipient)
+        message = await session.get(Message, message_id)
+        if not message:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Message not found"
+            )
+        
+        # Check if agent has access to this message
+        has_access = False
+        if message.sender_id == agent_id:
+            has_access = True
+        else:
+            # Check if agent is a recipient
+            recipient_check = await session.get(MessageRecipient, (message_id, agent_id))
+            if recipient_check:
+                has_access = True
+        
+        if not has_access:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Agent does not have access to this message"
+            )
+        
+        # Get metadata items for this message
+        metadata_stmt = select(AgentMessageMetadata).where(
+            AgentMessageMetadata.message_id == message_id
+        )
+        metadata_result = await session.execute(metadata_stmt)
+        metadata_items = metadata_result.scalars().all()
+        
+        # Build response
+        message_dict = {
+            "id": message.id,
+            "sender_id": message.sender_id,
+            "sent_at": message.sent_at,
+            "parent_message_id": message.parent_message_id,
+            "conversation_id": message.conversation_id,
+            "content": message.content,
+            "message_type": message.message_type,
+            "importance": message.importance,
+            "status": message.status,
+            "msg_metadata": message.msg_metadata,
+        }
+        
+        agent_dict = {
+            "id": agent.id,
+            "agent_name": agent.agent_name,
+            "ip_address": agent.ip_address,
+            "port": agent.port,
+            "created_at": agent.created_at,
+        }
+        
+        metadata_dicts = []
+        for item in metadata_items:
+            metadata_dicts.append({
+                "id": item.id,
+                "message_id": item.message_id,
+                "key": item.key,
+                "value": item.value,
+                "created_at": item.created_at,
+            })
+        
+        response_data = {
+            "message_id": message_id,
+            "message": MessageRead(**message_dict),
+            "agent": AgentRead(**agent_dict),
+            "metadata_items": [AgentMessageMetadataRead(**item) for item in metadata_dicts],
+        }
+        
+        return MessageMetadataWithAgent(**response_data)
+
+
+@router.put("/agents/{agent_id}/messages/mark-read", response_model=MarkAsReadResponse)
+async def mark_messages_as_read(agent_id: UUID, payload: MarkAsReadRequest):
+    """Mark all messages as read for an agent up to a specific date"""
+    async with db_manager.get_connection() as session:
+        # Verify agent exists
+        agent = await session.get(Agent, agent_id)
+        if not agent:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Agent not found"
+            )
+        
+        # Find message IDs to update using subquery
+        message_ids_subquery = select(MessageRecipient.message_id).join(
+            Message, Message.id == MessageRecipient.message_id
+        ).where(
+            and_(
+                MessageRecipient.recipient_id == agent_id,
+                Message.sent_at <= payload.read_up_to_date,
+                or_(MessageRecipient.is_read == False, MessageRecipient.is_read.is_(None))
+            )
+        )
+        
+        # Update messages as read up to the specified date
+        stmt = update(MessageRecipient).where(
+            and_(
+                MessageRecipient.recipient_id == agent_id,
+                MessageRecipient.message_id.in_(message_ids_subquery)
+            )
+        ).values(
+            is_read=True,
+            read_at=datetime.now()
+        )
+        
+        # Execute the update and get count
+        result = await session.execute(stmt)
+        updated_count = result.rowcount
+        await session.commit()
+        
+        return MarkAsReadResponse(
+            updated_count=updated_count,
+            message=f"Marked {updated_count} messages as read for agent {agent_id}"
+        )

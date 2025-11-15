@@ -120,3 +120,33 @@ class AgentMessageMetadataRead(AgentMessageMetadataBase):
     id: UUID
     created_at: Optional[datetime] = None
     model_config = ConfigDict(from_attributes=True)
+
+
+# Extended schemas for message pulling feature
+class MessageWithRecipientInfo(MessageRead):
+    """Message with recipient information for the requesting agent"""
+    is_read: Optional[bool] = None
+    read_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MessageMetadataWithAgent(BaseModel):
+    """Message metadata combined with agent information"""
+    message_id: UUID
+    message: MessageRead
+    agent: AgentRead
+    metadata_items: list[AgentMessageMetadataRead]
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarkAsReadRequest(BaseModel):
+    """Request to mark messages as read up to a specific date"""
+    read_up_to_date: datetime = Field(..., description="Mark all messages as read up to this date")
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MarkAsReadResponse(BaseModel):
+    """Response for mark as read operation"""
+    updated_count: int = Field(..., description="Number of messages marked as read")
+    message: str = Field(..., description="Success message")
+    model_config = ConfigDict(from_attributes=True)
