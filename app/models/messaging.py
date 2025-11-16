@@ -11,6 +11,31 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .base import Base
 
 
+class Conversation(Base):
+    __tablename__ = "conversations"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), 
+        primary_key=True, 
+        default=uuid.uuid4
+    )
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), 
+        server_default=func.now()
+    )
+    archived: Mapped[bool] = mapped_column(Boolean, default=False)
+    title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+
+    # Relationships
+    messages: Mapped[List["Message"]] = relationship(
+        "Message", 
+        back_populates="conversation",
+        cascade="all, delete-orphan"
+    )
+
+
 class Agent(Base):
     __tablename__ = "agents"
 
@@ -63,6 +88,7 @@ class Message(Base):
     )
     conversation_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         PG_UUID(as_uuid=True), 
+        ForeignKey("conversations.id"),
         nullable=True
     )
     content: Mapped[str] = mapped_column(Text, nullable=False)
@@ -88,6 +114,10 @@ class Message(Base):
     metadata_items: Mapped[List["AgentMessageMetadata"]] = relationship(
         "AgentMessageMetadata", 
         back_populates="message"
+    )
+    conversation: Mapped[Optional["Conversation"]] = relationship(
+        "Conversation", 
+        back_populates="messages"
     )
 
 

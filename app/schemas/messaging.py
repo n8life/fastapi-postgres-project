@@ -150,3 +150,37 @@ class MarkAsReadResponse(BaseModel):
     updated_count: int = Field(..., description="Number of messages marked as read")
     message: str = Field(..., description="Success message")
     model_config = ConfigDict(from_attributes=True)
+
+
+# Conversation schemas
+class ConversationBase(BaseModel):
+    title: Optional[str] = Field(None, description="Conversation title")
+    description: Optional[str] = Field(None, description="Conversation description")
+    archived: Optional[bool] = Field(False, description="Whether conversation is archived")
+    metadata: Optional[dict[str, Any]] = Field(None, description="Additional metadata as JSON")
+
+
+class ConversationCreate(ConversationBase):
+    pass
+
+
+class ConversationUpdate(BaseModel):
+    title: Optional[str] = Field(None, description="Conversation title")
+    description: Optional[str] = Field(None, description="Conversation description")
+    archived: Optional[bool] = Field(None, description="Whether conversation is archived")
+    metadata: Optional[dict[str, Any]] = Field(None, description="Additional metadata as JSON")
+
+
+class ConversationRead(ConversationBase):
+    id: UUID
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConversationWithMessages(ConversationRead):
+    """Conversation with all related messages, agents, and metadata"""
+    messages: list[MessageRead]
+    unique_agents: list[AgentRead] = Field(..., description="All agents involved in this conversation")
+    total_messages: int = Field(..., description="Total number of messages in conversation")
+    unread_count: int = Field(..., description="Number of unread messages")
+    model_config = ConfigDict(from_attributes=True)

@@ -13,8 +13,9 @@ from ..schemas.messaging import (
     MessageRecipientCreate, MessageRecipientUpdate, MessageRecipientRead,
     AgentMessageMetadataCreate, AgentMessageMetadataUpdate, AgentMessageMetadataRead,
     MessageWithRecipientInfo, MessageMetadataWithAgent, MarkAsReadRequest, MarkAsReadResponse,
+    ConversationCreate, ConversationUpdate, ConversationRead, ConversationWithMessages,
 )
-from ..models.messaging import Agent, Message, MessageRecipient, AgentMessageMetadata
+from ..models.messaging import Agent, Message, MessageRecipient, AgentMessageMetadata, Conversation
 
 
 router = APIRouter(prefix="", tags=["messaging"])
@@ -413,4 +414,167 @@ async def mark_messages_as_read(agent_id: UUID, payload: MarkAsReadRequest):
         return MarkAsReadResponse(
             updated_count=updated_count,
             message=f"Marked {updated_count} messages as read for agent {agent_id}"
+        )
+
+
+# Conversation endpoints
+@router.post("/conversations", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
+async def create_conversation(payload: ConversationCreate):
+    """Create a new conversation"""
+    async with db_manager.get_connection() as session:
+        try:
+            conversation = Conversation(**payload.model_dump())
+            session.add(conversation)
+            await session.commit()
+            await session.refresh(conversation)
+            return conversation
+        except IntegrityError as e:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Conversation creation failed due to constraint violation"
+            )
+
+
+@router.put("/conversations/{conversation_id}", response_model=ConversationRead)
+async def update_conversation(conversation_id: UUID, payload: ConversationUpdate):
+    """Update an existing conversation"""
+    async with db_manager.get_connection() as session:
+        conversation = await session.get(Conversation, conversation_id)
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, 
+                detail="Conversation not found"
+            )
+        
+        try:
+            update_data = payload.model_dump(exclude_unset=True)
+            for key, value in update_data.items():
+                setattr(conversation, key, value)
+            
+            await session.commit()
+            await session.refresh(conversation)
+            return conversation
+        except IntegrityError:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Conversation update failed due to constraint violation"
+            )
+
+
+@router.get("/conversations", response_model=List[ConversationRead])
+async def list_conversations():
+    """List all conversations"""
+    async with db_manager.get_connection() as session:
+        result = await session.execute(select(Conversation).order_by(Conversation.created_at.desc()))
+        conversations = result.scalars().all()
+        return conversations
+
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationRead)
+async def get_conversation(conversation_id: UUID):
+    """Get a single conversation by ID"""
+    async with db_manager.get_connection() as session:
+        conversation = await session.get(Conversation, conversation_id)
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found"
+            )
+        return conversation
+
+
+@router.get("/conversations/{conversation_id}/details", response_model=ConversationWithMessages)
+async def get_conversation_details(conversation_id: UUID):
+    """Get comprehensive conversation info including all messages, agents, and metadata"""
+    async with db_manager.get_connection() as session:
+        # Get conversation
+        conversation = await session.get(Conversation, conversation_id)
+        if not conversation:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Conversation not found"
+            )
+        
+        # Get all messages in conversation with recipients info
+        messages_stmt = select(Message).where(
+            Message.conversation_id == conversation_id
+        ).order_by(Message.sent_at.asc())
+        
+        messages_result = await session.execute(messages_stmt)
+        messages = messages_result.scalars().all()
+        
+        # Get all unique agents involved in the conversation
+        agents_stmt = select(Agent).distinct().join(
+            Message, 
+            or_(
+                Message.sender_id == Agent.id,
+                Agent.id.in_(
+                    select(MessageRecipient.recipient_id).where(
+                        MessageRecipient.message_id.in_(
+                            select(Message.id).where(Message.conversation_id == conversation_id)
+                        )
+                    )
+                )
+            )
+        )
+        
+        agents_result = await session.execute(agents_stmt)
+        unique_agents = agents_result.scalars().all()
+        
+        # Count unread messages in conversation
+        unread_stmt = select(MessageRecipient).join(
+            Message, Message.id == MessageRecipient.message_id
+        ).where(
+            and_(
+                Message.conversation_id == conversation_id,
+                or_(MessageRecipient.is_read == False, MessageRecipient.is_read.is_(None))
+            )
+        )
+        
+        unread_result = await session.execute(unread_stmt)
+        unread_count = len(unread_result.scalars().all())
+        
+        # Build response
+        conversation_dict = {
+            "id": conversation.id,
+            "created_at": conversation.created_at,
+            "archived": conversation.archived,
+            "title": conversation.title,
+            "description": conversation.description,
+            "metadata": conversation.metadata,
+        }
+        
+        message_dicts = []
+        for msg in messages:
+            message_dicts.append({
+                "id": msg.id,
+                "sender_id": msg.sender_id,
+                "sent_at": msg.sent_at,
+                "parent_message_id": msg.parent_message_id,
+                "conversation_id": msg.conversation_id,
+                "content": msg.content,
+                "message_type": msg.message_type,
+                "importance": msg.importance,
+                "status": msg.status,
+                "msg_metadata": msg.msg_metadata,
+            })
+        
+        agent_dicts = []
+        for agent in unique_agents:
+            agent_dicts.append({
+                "id": agent.id,
+                "agent_name": agent.agent_name,
+                "ip_address": agent.ip_address,
+                "port": agent.port,
+                "created_at": agent.created_at,
+            })
+        
+        return ConversationWithMessages(
+            **conversation_dict,
+            messages=[MessageRead(**msg) for msg in message_dicts],
+            unique_agents=[AgentRead(**agent) for agent in agent_dicts],
+            total_messages=len(messages),
+            unread_count=unread_count
         )
