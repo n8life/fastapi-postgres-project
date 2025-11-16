@@ -45,7 +45,7 @@ async def test_conversation_data(client: AsyncClient):
     # Create agents
     agent1_data = {
         "agent_name": "conversation-agent-1",
-        "ip_address": "*************",
+        "ip_address": "192.168.1.10",
         "port": 8080
     }
     agent1_response = await client.post("/agents", json=agent1_data)
@@ -53,7 +53,7 @@ async def test_conversation_data(client: AsyncClient):
     
     agent2_data = {
         "agent_name": "conversation-agent-2", 
-        "ip_address": "*************",
+        "ip_address": "192.168.1.11",
         "port": 8081
     }
     agent2_response = await client.post("/agents", json=agent2_data)

@@ -423,11 +423,22 @@ async def create_conversation(payload: ConversationCreate):
     """Create a new conversation"""
     async with db_manager.get_connection() as session:
         try:
-            conversation = Conversation(**payload.model_dump())
+            # Convert payload to use correct field name
+            data = payload.model_dump(by_alias=False)
+            conversation = Conversation(**data)
             session.add(conversation)
             await session.commit()
             await session.refresh(conversation)
-            return conversation
+            
+            # Return properly mapped response
+            return ConversationRead(
+                id=conversation.id,
+                created_at=conversation.created_at,
+                title=conversation.title,
+                description=conversation.description,
+                archived=conversation.archived,
+                conv_metadata=conversation.conv_metadata
+            )
         except IntegrityError as e:
             await session.rollback()
             raise HTTPException(
@@ -448,13 +459,22 @@ async def update_conversation(conversation_id: UUID, payload: ConversationUpdate
             )
         
         try:
-            update_data = payload.model_dump(exclude_unset=True)
+            update_data = payload.model_dump(exclude_unset=True, by_alias=False)
             for key, value in update_data.items():
                 setattr(conversation, key, value)
             
             await session.commit()
             await session.refresh(conversation)
-            return conversation
+            
+            # Return properly mapped response
+            return ConversationRead(
+                id=conversation.id,
+                created_at=conversation.created_at,
+                title=conversation.title,
+                description=conversation.description,
+                archived=conversation.archived,
+                conv_metadata=conversation.conv_metadata
+            )
         except IntegrityError:
             await session.rollback()
             raise HTTPException(
@@ -469,7 +489,19 @@ async def list_conversations():
     async with db_manager.get_connection() as session:
         result = await session.execute(select(Conversation).order_by(Conversation.created_at.desc()))
         conversations = result.scalars().all()
-        return conversations
+        
+        # Return properly mapped responses
+        return [
+            ConversationRead(
+                id=conv.id,
+                created_at=conv.created_at,
+                title=conv.title,
+                description=conv.description,
+                archived=conv.archived,
+                conv_metadata=conv.conv_metadata
+            )
+            for conv in conversations
+        ]
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationRead)
@@ -482,7 +514,16 @@ async def get_conversation(conversation_id: UUID):
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Conversation not found"
             )
-        return conversation
+        
+        # Return properly mapped response
+        return ConversationRead(
+            id=conversation.id,
+            created_at=conversation.created_at,
+            title=conversation.title,
+            description=conversation.description,
+            archived=conversation.archived,
+            conv_metadata=conversation.conv_metadata
+        )
 
 
 @router.get("/conversations/{conversation_id}/details", response_model=ConversationWithMessages)
@@ -543,7 +584,7 @@ async def get_conversation_details(conversation_id: UUID):
             "archived": conversation.archived,
             "title": conversation.title,
             "description": conversation.description,
-            "metadata": conversation.metadata,
+            "conv_metadata": conversation.conv_metadata,
         }
         
         message_dicts = []

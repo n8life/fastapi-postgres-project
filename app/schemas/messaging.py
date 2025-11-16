@@ -163,7 +163,8 @@ class ConversationBase(BaseModel):
     title: Optional[str] = Field(None, description="Conversation title")
     description: Optional[str] = Field(None, description="Conversation description")
     archived: Optional[bool] = Field(False, description="Whether conversation is archived")
-    metadata: Optional[dict[str, Any]] = Field(None, description="Additional metadata as JSON")
+    conv_metadata: Optional[dict[str, Any]] = Field(None, description="Additional metadata as JSON", alias="metadata")
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ConversationCreate(ConversationBase):
@@ -174,13 +175,14 @@ class ConversationUpdate(BaseModel):
     title: Optional[str] = Field(None, description="Conversation title")
     description: Optional[str] = Field(None, description="Conversation description")
     archived: Optional[bool] = Field(None, description="Whether conversation is archived")
-    metadata: Optional[dict[str, Any]] = Field(None, description="Additional metadata as JSON")
+    conv_metadata: Optional[dict[str, Any]] = Field(None, description="Additional metadata as JSON", alias="metadata")
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ConversationRead(ConversationBase):
     id: UUID
     created_at: Optional[datetime] = None
-    model_config = ConfigDict(from_attributes=True)
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class ConversationWithMessages(ConversationRead):

@@ -26,7 +26,7 @@ class Conversation(Base):
     archived: Mapped[bool] = mapped_column(Boolean, default=False)
     title: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    conv_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
 
     # Relationships
     messages: Mapped[List["Message"]] = relationship(
