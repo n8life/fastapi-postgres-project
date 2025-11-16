@@ -163,7 +163,7 @@ Messages support threading via `parent_message_id` and conversation grouping via
 
 1. **Clone and navigate to the project:**
    ```bash
-   cd /Users/nsmith/fastapi-postgres-project
+   cd fastapi-postgres-project
    ```
 
 2. **Start the application:**
