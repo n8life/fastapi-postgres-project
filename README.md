@@ -49,6 +49,7 @@ The application provides a comprehensive messaging system with the following ent
 
 #### Database Schema Overview
 - **agents**: Store agent information (UUID, name, IP address, port)
+- **conversations**: Conversation organization with title, description, archived status, and metadata (Feature 4)
 - **messages**: Main messages table with threading and conversation support
 - **message_recipients**: Track message delivery and read status (composite key)
 - **agent_message_metadata**: Additional key-value metadata for messages
@@ -74,6 +75,13 @@ The application provides a comprehensive messaging system with the following ent
 - `GET /agents/{agent_id}/messages/unread` - Pull unread messages for an agent
 - `GET /messages/{message_id}/metadata/{agent_id}` - Get message metadata with agent information
 - `PUT /agents/{agent_id}/messages/mark-read` - Mark messages as read up to a given date
+
+#### Conversation Management (Feature 4)
+- `POST /conversations` - Create a new conversation
+- `PUT /conversations/{conversation_id}` - Update an existing conversation
+- `GET /conversations` - List all conversations (ordered by creation date, newest first)
+- `GET /conversations/{conversation_id}` - Get a single conversation by ID
+- `GET /conversations/{conversation_id}/details` - Get comprehensive conversation info with all messages, agents, and metadata
 
 #### API Examples
 
@@ -117,8 +125,32 @@ curl -X PUT http://localhost:8000/agents/{agent_id}/messages/mark-read \
   -d '{"read_up_to_date": "2024-01-01T12:00:00Z"}'
 ```
 
-**Message Threading:**
-Messages support threading via `parent_message_id` and conversation grouping via `conversation_id`.
+**Create a Conversation:**
+```bash
+curl -X POST http://localhost:8000/conversations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Project Discussion",
+    "description": "Discussion about the new features",
+    "archived": false,
+    "metadata": {"priority": "high", "department": "engineering"}
+  }'
+```
+
+**Get Conversation Details:**
+```bash
+# Get comprehensive conversation information
+curl -X GET http://localhost:8000/conversations/{conversation_id}/details
+
+# Get just conversation metadata
+curl -X GET http://localhost:8000/conversations/{conversation_id}
+
+# List all conversations
+curl -X GET http://localhost:8000/conversations
+```
+
+**Message Threading and Conversations:**
+Messages support threading via `parent_message_id` and conversation grouping via `conversation_id`. The conversation system (Feature 4) allows organizing related messages into structured conversations with titles, descriptions, and metadata.
 
 **Status Codes:**
 - `201` - Resource created successfully
@@ -209,8 +241,8 @@ uv run pytest tests/test_api.py
 ## Database
 
 The application automatically:
-- Creates a `users` table on startup
-- Inserts sample data if the table is empty
+- Creates database tables (`users`, `agents`, `messages`, `conversations`, `message_recipients`, `agent_message_metadata`) on startup
+- Inserts sample data if tables are empty
 - Uses connection pooling for efficient database access
 
 ### Sample Data
