@@ -546,18 +546,25 @@ async def get_conversation_details(conversation_id: UUID):
         messages_result = await session.execute(messages_stmt)
         messages = messages_result.scalars().all()
         
-        # Get all unique agents involved in the conversation
-        agents_stmt = select(Agent).distinct().join(
-            Message, 
+        # Get all unique agents involved in the conversation (senders + recipients)
+        # First get sender agent IDs from messages in this conversation
+        sender_ids_stmt = select(Message.sender_id).where(
+            and_(
+                Message.conversation_id == conversation_id,
+                Message.sender_id.is_not(None)
+            )
+        )
+        
+        # Then get recipient agent IDs from message_recipients for messages in this conversation
+        recipient_ids_stmt = select(MessageRecipient.recipient_id).join(
+            Message, Message.id == MessageRecipient.message_id
+        ).where(Message.conversation_id == conversation_id)
+        
+        # Get agents who are either senders or recipients
+        agents_stmt = select(Agent).where(
             or_(
-                Message.sender_id == Agent.id,
-                Agent.id.in_(
-                    select(MessageRecipient.recipient_id).where(
-                        MessageRecipient.message_id.in_(
-                            select(Message.id).where(Message.conversation_id == conversation_id)
-                        )
-                    )
-                )
+                Agent.id.in_(sender_ids_stmt),
+                Agent.id.in_(recipient_ids_stmt)
             )
         )
         
