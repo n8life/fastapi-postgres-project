@@ -79,6 +79,12 @@ class MessageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MessageWithConversation(MessageRead):
+    """Message with conversation information included"""
+    conversation: Optional[ConversationRead] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 # MessageRecipients (composite key model)
 class MessageRecipientBase(BaseModel):
     message_id: UUID = Field(..., description="Message ID")
