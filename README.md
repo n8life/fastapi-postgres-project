@@ -11,6 +11,7 @@ A simple FastAPI application that connects to a PostgreSQL database and provides
 - Environment-based configuration
 - Database connection pooling
 - Health check endpoint
+- CLI command execution with security validation
 
 ## Project Structure
 
@@ -21,14 +22,18 @@ A simple FastAPI application that connects to a PostgreSQL database and provides
 │   ├── main.py          # FastAPI application entry point
 │   ├── database.py      # Database connection and queries
 │   ├── routers/
-│   │   └── messaging.py # Message and agent API routes
+│   │   ├── messaging.py # Message and agent API routes
+│   │   └── cli.py       # CLI command execution routes
 │   └── schemas/
-│       └── messaging.py # Pydantic models for messaging API
+│       ├── messaging.py # Pydantic models for messaging API
+│       └── cli.py       # Pydantic models for CLI operations
 ├── tests/
 │   ├── __init__.py
 │   ├── test_api.py                 # Core API endpoint tests
 │   ├── test_messaging_endpoints.py # Message and agent API tests
-│   └── test_message_pulling.py     # Feature 3: Pull messages tests
+│   ├── test_message_pulling.py     # Feature 3: Pull messages tests
+│   ├── test_conversations.py       # Feature 4: Conversation tests
+│   └── test_cli.py                 # Feature 5: CLI command tests
 ├── docker-compose.yml   # Docker services configuration
 ├── Dockerfile          # FastAPI app container
 ├── pyproject.toml      # Project dependencies (uv)
@@ -82,6 +87,9 @@ The application provides a comprehensive messaging system with the following ent
 - `GET /conversations` - List all conversations (ordered by creation date, newest first)
 - `GET /conversations/{conversation_id}` - Get a single conversation by ID
 - `GET /conversations/{conversation_id}/details` - Get comprehensive conversation info with all messages, agents, and metadata
+
+#### CLI Command Execution (Feature 5)
+- `POST /cli/echo` - Echo a message to the command line via subprocess
 
 #### API Examples
 
@@ -147,6 +155,24 @@ curl -X GET http://localhost:8000/conversations/{conversation_id}
 
 # List all conversations
 curl -X GET http://localhost:8000/conversations
+```
+
+**Execute CLI Commands:**
+```bash
+# Echo a message to the command line
+curl -X POST http://localhost:8000/cli/echo \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "Hello from the API!"
+  }'
+
+# Response:
+{
+  "success": true,
+  "message": "Hello from the API!",
+  "output": "Hello from the API!",
+  "error": null
+}
 ```
 
 **Message Threading and Conversations:**
@@ -266,6 +292,8 @@ The application creates these sample users:
 - **Agent isolation**: Agents can only access their own messages (sender/recipient)
 - **Access control**: Message metadata endpoints verify agent access permissions
 - **Data privacy**: No endpoint allows accessing multiple agents' information simultaneously
+- **CLI security**: Command injection prevention through strict input validation and safe shell escaping
+- **Command restrictions**: Only safe alphanumeric characters and basic punctuation allowed in CLI commands
 
 ## Development
 
