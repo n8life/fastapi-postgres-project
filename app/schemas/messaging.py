@@ -79,6 +79,12 @@ class MessageRead(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class MessageWithConversation(MessageRead):
+    """Message with conversation information included"""
+    conversation: Optional[ConversationRead] = None
+    model_config = ConfigDict(from_attributes=True)
+
+
 # MessageRecipients (composite key model)
 class MessageRecipientBase(BaseModel):
     message_id: UUID = Field(..., description="Message ID")
@@ -149,4 +155,40 @@ class MarkAsReadResponse(BaseModel):
     """Response for mark as read operation"""
     updated_count: int = Field(..., description="Number of messages marked as read")
     message: str = Field(..., description="Success message")
+    model_config = ConfigDict(from_attributes=True)
+
+
+# Conversation schemas
+class ConversationBase(BaseModel):
+    title: Optional[str] = Field(None, description="Conversation title")
+    description: Optional[str] = Field(None, description="Conversation description")
+    archived: Optional[bool] = Field(False, description="Whether conversation is archived")
+    conv_metadata: Optional[dict[str, Any]] = Field(None, description="Additional metadata as JSON", alias="metadata")
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ConversationCreate(ConversationBase):
+    pass
+
+
+class ConversationUpdate(BaseModel):
+    title: Optional[str] = Field(None, description="Conversation title")
+    description: Optional[str] = Field(None, description="Conversation description")
+    archived: Optional[bool] = Field(None, description="Whether conversation is archived")
+    conv_metadata: Optional[dict[str, Any]] = Field(None, description="Additional metadata as JSON", alias="metadata")
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class ConversationRead(ConversationBase):
+    id: UUID
+    created_at: Optional[datetime] = None
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+
+
+class ConversationWithMessages(ConversationRead):
+    """Conversation with all related messages, agents, and metadata"""
+    messages: list[MessageRead]
+    unique_agents: list[AgentRead] = Field(..., description="All agents involved in this conversation")
+    total_messages: int = Field(..., description="Total number of messages in conversation")
+    unread_count: int = Field(..., description="Number of unread messages")
     model_config = ConfigDict(from_attributes=True)
