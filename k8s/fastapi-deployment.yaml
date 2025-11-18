@@ -15,12 +15,35 @@ spec:
       labels:
         app: fastapi-app
     spec:
+      serviceAccountName: fastapi-service-account
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: fastapi-app
-        image: fastapi-postgres-app:latest
-        imagePullPolicy: Never  # For local development
+        image: fastapi-postgres-app:v1.0.0@sha256:dummy-sha-will-be-replaced-with-actual
+        imagePullPolicy: Always
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 65534
+          runAsGroup: 65534
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
         ports:
         - containerPort: 8000
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+        - name: app-cache
+          mountPath: /home/nonroot/.cache
         env:
         - name: DATABASE_URL
           value: "postgresql+asyncpg://postgres:password@postgres-service:5432/testdb"
@@ -47,4 +70,9 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}
+      - name: app-cache
+        emptyDir: {}
       restartPolicy: Always
