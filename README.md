@@ -319,7 +319,9 @@ For production use, consider adding a proper migration system like Alembic.
 
 ## Deployment
 
-The application is containerized and ready for deployment with built-in health monitoring:
+The application supports multiple deployment methods:
+
+### Docker Compose (Recommended for Development)
 
 ```bash
 # Build and run with Docker Compose
@@ -331,6 +333,121 @@ docker-compose ps
 # Scale the application
 docker-compose up --scale app=3
 ```
+
+### Kubernetes Deployment (Production Ready)
+
+The application includes comprehensive Kubernetes manifests for production deployment:
+
+#### Prerequisites
+- Kubernetes cluster (local or cloud)
+- `kubectl` configured to access your cluster
+- Docker for building images
+
+#### Quick Deployment
+
+```bash
+# Deploy using the provided script
+cd k8s
+./deploy.sh
+```
+
+#### Manual Deployment
+
+```bash
+# Build the Docker image
+docker build -t fastapi-postgres-app:latest .
+
+# Apply Kubernetes manifests in order
+kubectl apply -f k8s/namespace.yaml
+kubectl apply -f k8s/postgres-storage.yaml
+kubectl apply -f k8s/postgres-deployment.yaml
+kubectl apply -f k8s/fastapi-deployment.yaml
+kubectl apply -f k8s/services.yaml
+```
+
+#### Accessing the Application
+
+**Option 1: LoadBalancer (if supported):**
+```bash
+# Get external IP
+kubectl get svc fastapi-service -n fastapi-postgres
+# Access via external IP on port 80
+```
+
+**Option 2: Port Forward (for local/development clusters):**
+```bash
+# Forward port to localhost
+kubectl port-forward svc/fastapi-service 8000:80 -n fastapi-postgres
+# Access at http://localhost:8000
+```
+
+**Option 3: NodePort (alternative):**
+```bash
+# Change service type to NodePort in services.yaml
+# Then access via node IP and assigned port
+kubectl get nodes -o wide
+kubectl get svc fastapi-service -n fastapi-postgres
+```
+
+#### Kubernetes Resources
+
+The deployment creates the following resources:
+
+- **Namespace**: `fastapi-postgres` - Isolated environment for all resources
+- **Persistent Volume**: Local storage for PostgreSQL data (1Gi)
+- **PostgreSQL**: Single replica with health checks and resource limits
+- **FastAPI**: 2 replicas with health checks and horizontal scaling capability
+- **Services**: ClusterIP for PostgreSQL, LoadBalancer for FastAPI
+
+#### Monitoring Deployment
+
+```bash
+# Check deployment status
+kubectl get pods -n fastapi-postgres
+kubectl get services -n fastapi-postgres
+
+# View logs
+kubectl logs -f deployment/fastapi-app -n fastapi-postgres
+kubectl logs -f deployment/postgres -n fastapi-postgres
+
+# Check resource usage
+kubectl top pods -n fastapi-postgres
+```
+
+#### Scaling
+
+```bash
+# Scale FastAPI application
+kubectl scale deployment fastapi-app --replicas=5 -n fastapi-postgres
+
+# Check scaling status
+kubectl get deployments -n fastapi-postgres
+```
+
+#### Cleanup
+
+```bash
+# Use cleanup script
+cd k8s
+./cleanup.sh
+
+# Or manually delete resources
+kubectl delete namespace fastapi-postgres
+```
+
+#### Production Considerations
+
+1. **Storage**: Replace local volumes with cloud-based persistent volumes
+2. **Security**: Use secrets for database credentials instead of plain text
+3. **Networking**: Configure ingress controllers for proper domain routing
+4. **Monitoring**: Add Prometheus/Grafana monitoring
+5. **Backup**: Implement PostgreSQL backup strategies
+6. **SSL/TLS**: Configure certificates for HTTPS
+
+#### Available Scripts
+
+- `k8s/deploy.sh`: Automated deployment script
+- `k8s/cleanup.sh`: Complete cleanup script
 
 ### Health Monitoring
 
