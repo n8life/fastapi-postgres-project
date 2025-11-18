@@ -295,6 +295,16 @@ The application creates these sample users:
 - **CLI security**: Command injection prevention through strict input validation and safe shell escaping
 - **Command restrictions**: Only safe alphanumeric characters and basic punctuation allowed in CLI commands
 
+### Docker Security
+
+The Docker container follows security best practices:
+
+- **Non-root user**: Application runs as `appuser` (uid/gid 1000) instead of root
+- **Health monitoring**: Built-in healthcheck using `/health` endpoint with 30-second intervals
+- **Minimal permissions**: Proper file ownership and permissions for application files
+- **Clean environment**: Apt cache cleanup to reduce attack surface
+- **Secure defaults**: No unnecessary privileges or capabilities
+
 ## Development
 
 ### Adding New Endpoints
@@ -309,15 +319,26 @@ For production use, consider adding a proper migration system like Alembic.
 
 ## Deployment
 
-The application is containerized and ready for deployment:
+The application is containerized and ready for deployment with built-in health monitoring:
 
 ```bash
 # Build and run with Docker Compose
 docker-compose up --build -d
 
+# Check container health status
+docker-compose ps
+
 # Scale the application
 docker-compose up --scale app=3
 ```
+
+### Health Monitoring
+
+The Docker container includes a built-in healthcheck that:
+- Tests the `/health` endpoint every 30 seconds
+- Allows 10 seconds timeout per check
+- Waits 5 seconds before starting checks
+- Marks container unhealthy after 3 consecutive failures
 
 ## License
 
