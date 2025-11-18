@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: fastapi-postgres
+  labels:
+    app: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi-service
+  namespace: fastapi-postgres
+  labels:
+    app: fastapi-app
+spec:
+  selector:
+    app: fastapi-app
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+  type: LoadBalancer
