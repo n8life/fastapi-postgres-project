@@ -1,0 +1,22 @@
+services:
+  app:
+    environment:
+      # Enable SSH connection
+      - USE_SSH_CONNECTION=true
+      # SSH connection settings (replace with actual values for testing)
+      - SSH_HOST=ssh-server-hostname  # Replace with actual SSH server
+      - SSH_USER=nsmith
+      - SSH_KEY_PATH=/ssh/id_postgres_db
+      # PostgreSQL settings for SSH connection
+      - SSH_POSTGRES_HOST=localhost
+      - SSH_POSTGRES_PORT=5432
+      - SSH_POSTGRES_USER=postgres
+      - SSH_POSTGRES_PASSWORD=postgres
+      - SSH_POSTGRES_DB=testdb
+      # Enable SQL logging for debugging
+      - SQLALCHEMY_ECHO=1
+    volumes:
+      # Mount SSH key (user must provide the actual key)
+      - /Users/nsmith/.ssh/id_postgres_db:/ssh/id_postgres_db:ro
+    # No dependency on local db when using SSH connection
+    depends_on: []
