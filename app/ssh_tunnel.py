@@ -48,11 +48,7 @@ class SSHTunnelManager:
                 ssh_host,
                 ssh_username=ssh_user,
                 ssh_pkey=ssh_key_path,
-                remote_bind_address=(postgres_host, postgres_port),
-                local_bind_address=('localhost', 0),  # Use any available local port
-                set_keepalive=10.0,  # Keep connection alive
-                host_pkey_directories=[],  # Skip looking for host keys
-                skip_tunnel_checkup=False,  # Perform tunnel checkup
+                remote_bind_address=(postgres_host, postgres_port)
             )
             
             # Start the tunnel
@@ -104,6 +100,6 @@ class SSHTunnelManager:
             
         postgres_user = os.getenv("SSH_POSTGRES_USER", "postgres")
         postgres_password = os.getenv("SSH_POSTGRES_PASSWORD", "postgres")
-        postgres_db = os.getenv("SSH_POSTGRES_DB", "testdb")
+        postgres_db = os.getenv("SSH_POSTGRES_DB", "postgres")
         
         return f"postgresql+asyncpg://{postgres_user}:{postgres_password}@localhost:{self.local_port}/{postgres_db}"
