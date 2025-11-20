@@ -35,9 +35,9 @@ info:
 
 servers:
   - url: http://localhost:8000
-    description: Development server
+    description: Development server (HTTP allowed for local development only)
   - url: https://api.example.com
-    description: Production server
+    description: Production server (HTTPS required)
 
 security:
   - ApiKeyAuth: []
@@ -417,6 +417,7 @@ paths:
             application/json:
               schema:
                 type: array
+                maxItems: 1000
                 items:
                   $ref: '#/components/schemas/MessageWithRecipientInfo'
         '404':
@@ -450,6 +451,7 @@ paths:
             application/json:
               schema:
                 type: array
+                maxItems: 1000
                 items:
                   $ref: '#/components/schemas/MessageWithRecipientInfo'
         '404':
@@ -556,6 +558,7 @@ paths:
             application/json:
               schema:
                 type: array
+                maxItems: 500
                 items:
                   $ref: '#/components/schemas/ConversationRead'
       security:
@@ -751,8 +754,13 @@ components:
         - API keys should never be included in client-side code or version control
         - Use environment variables or secure configuration management
         - Rotate API keys regularly
-        - API keys must be transmitted over HTTPS only
-        - Example header: `X-API-Key: your-secure-api-key-here`
+        - API keys MUST be transmitted over HTTPS only in production
+        - Example header: `X-API-Key: ************`
+        
+        **HTTPS Requirement:**
+        - All API requests MUST use HTTPS in production environments
+        - HTTP connections are rejected in production to prevent cleartext API key transmission
+        - Local development may use HTTP for testing purposes only
         
         **Note:** This specification does not contain actual API key values for security reasons.
 
@@ -1187,6 +1195,7 @@ components:
           $ref: '#/components/schemas/AgentRead'
         metadata_items:
           type: array
+          maxItems: 100
           items:
             $ref: '#/components/schemas/AgentMessageMetadataRead'
           description: List of metadata items for the message
@@ -1314,11 +1323,13 @@ components:
           properties:
             messages:
               type: array
+              maxItems: 1000
               items:
                 $ref: '#/components/schemas/MessageRead'
               description: All messages in the conversation
             unique_agents:
               type: array
+              maxItems: 50
               items:
                 $ref: '#/components/schemas/AgentRead'
               description: All agents involved in this conversation
@@ -1388,11 +1399,13 @@ components:
       properties:
         detail:
           type: array
+          maxItems: 20
           items:
             type: object
             properties:
               loc:
                 type: array
+                maxItems: 10
                 items:
                   oneOf:
                     - type: string
