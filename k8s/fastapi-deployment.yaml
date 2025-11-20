@@ -46,7 +46,12 @@ spec:
           mountPath: /home/nonroot/.cache
         env:
         - name: DATABASE_URL
-          value: "postgresql+asyncpg://postgres:password@postgres-service:5432/testdb"
+          value: "postgresql+asyncpg://postgres:$(POSTGRES_PASSWORD)@postgres-service:5432/testdb"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secret
+              key: password
         livenessProbe:
           httpGet:
             path: /

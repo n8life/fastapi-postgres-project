@@ -1,21 +1,29 @@
+# Security improvements: read-only filesystem, environment variables for credentials
 services:
   app:
     build: .
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/testdb
+      - DATABASE_URL=postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-password}@db:5432/testdb
+      - UVICORN_HOST=0.0.0.0
     depends_on:
       db:
         condition: service_healthy
     restart: unless-stopped
+    # TODO: Enable read-only filesystem (requires additional tmpfs mounts for full compatibility)
+    # read_only: true
+    # tmpfs:
+    #   - /tmp
+    #   - /var/tmp
+    #   - /home/nobody/.cache
 
   db:
     image: postgres:15.8@sha256:eb3747f5d0a92195ca486d2f15d9a4ee5e9461b0332fe87fbc59069490a5c659
     environment:
       - POSTGRES_DB=testdb
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-password}
     ports:
       - "5432:5432"
     volumes:
