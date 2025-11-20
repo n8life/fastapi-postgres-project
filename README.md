@@ -249,6 +249,61 @@ Messages support threading via `parent_message_id` and conversation grouping via
    uv run python main.py
    ```
 
+## SSH Database Connection Setup
+
+To use SSH tunnel connection for enhanced security:
+
+### Prerequisites
+- SSH access to a server with PostgreSQL access
+- SSH private key file
+- PostgreSQL server accessible from the SSH server
+
+### Local Development with SSH
+
+1. **Set SSH environment variables:**
+   ```bash
+   export USE_SSH_CONNECTION=true
+   export SSH_HOST=your-ssh-server.com
+   export SSH_USER=your-ssh-username
+   export SSH_KEY_PATH=/path/to/your/ssh/private/key
+   export SSH_POSTGRES_HOST=localhost  # PostgreSQL host from SSH server perspective
+   export SSH_POSTGRES_PORT=5432
+   export SSH_POSTGRES_USER=postgres
+   export SSH_POSTGRES_PASSWORD=your-postgres-password
+   export SSH_POSTGRES_DB=your-database-name
+   ```
+
+2. **Run the application:**
+   ```bash
+   uv run uvicorn app.main:app --reload
+   ```
+
+### Docker with SSH Connection
+
+1. **Create SSH docker-compose override:**
+   ```bash
+   # Use the provided docker-compose.ssh.yml
+   docker-compose -f docker-compose.yml -f docker-compose.ssh.yml up --build
+   ```
+
+2. **Or manually set environment variables:**
+   ```yaml
+   services:
+     app:
+       environment:
+         - USE_SSH_CONNECTION=true
+         - SSH_HOST=your-ssh-server.com
+         - SSH_USER=your-ssh-username
+         - SSH_KEY_PATH=/ssh/private_key
+         - SSH_POSTGRES_HOST=localhost
+         - SSH_POSTGRES_PORT=5432
+         - SSH_POSTGRES_USER=postgres
+         - SSH_POSTGRES_PASSWORD=your-password
+         - SSH_POSTGRES_DB=your-database
+       volumes:
+         - /path/to/your/ssh/key:/ssh/private_key:ro
+   ```
+
 ## Testing
 
 Run the test suite:
@@ -278,15 +333,53 @@ The application creates these sample users:
 - ID 2: Jane Smith (jane@example.com)
 - ID 3: Bob Johnson (bob@example.com)
 
+## Database Connection Options
+
+The application supports two database connection methods:
+
+### Direct Connection (Default)
+Connects directly to a PostgreSQL database.
+
+### SSH Tunnel Connection
+Connects to a PostgreSQL database through an SSH tunnel for enhanced security.
+
 ## Environment Variables
 
+### Direct Connection
 - `DATABASE_URL`: PostgreSQL connection string (uses asyncpg driver)
   - Default: `postgresql+asyncpg://postgres:password@localhost:5432/testdb`
 
+### SSH Connection
+- `USE_SSH_CONNECTION`: Enable SSH tunnel connection (`true`/`false`)
+  - Default: `false`
+- `SSH_HOST`: SSH server hostname or IP address
+- `SSH_USER`: SSH username
+- `SSH_KEY_PATH`: Path to SSH private key file
+- `SSH_POSTGRES_HOST`: PostgreSQL host accessible from SSH server
+  - Default: `localhost`
+- `SSH_POSTGRES_PORT`: PostgreSQL port on SSH server
+  - Default: `5432`
+- `SSH_POSTGRES_USER`: PostgreSQL username
+  - Default: `postgres`
+- `SSH_POSTGRES_PASSWORD`: PostgreSQL password
+  - Default: `postgres`
+- `SSH_POSTGRES_DB`: PostgreSQL database name
+  - Default: `testdb`
+
+### Other Configuration
+- `DB_POOL_SIZE`: Database connection pool size (default: 5)
+- `DB_MAX_OVERFLOW`: Maximum connection pool overflow (default: 10)
+- `SQLALCHEMY_ECHO`: Enable SQL query logging (`1`/`0`, default: 0)
+
 ## Security Features
 
+### Database Security
 - Environment-based database credentials
 - Connection pooling to prevent connection exhaustion
+- **SSH Tunnel Support**: Secure database connections through encrypted SSH tunnels
+- **Dual Connection Modes**: Direct or SSH-tunneled connections based on environment configuration
+
+### API Security
 - Input validation with Pydantic models
 - Proper error handling and HTTP status codes
 - **Agent isolation**: Agents can only access their own messages (sender/recipient)
@@ -294,6 +387,13 @@ The application creates these sample users:
 - **Data privacy**: No endpoint allows accessing multiple agents' information simultaneously
 - **CLI security**: Command injection prevention through strict input validation and safe shell escaping
 - **Command restrictions**: Only safe alphanumeric characters and basic punctuation allowed in CLI commands
+
+### SSH Connection Security
+- **Private Key Authentication**: Uses SSH private keys for secure authentication
+- **Encrypted Tunnels**: All database traffic encrypted through SSH tunnel
+- **No Direct Database Exposure**: PostgreSQL server doesn't need direct internet access
+- **Key File Protection**: SSH keys mounted read-only in containers
+- **Connection Validation**: SSH tunnel health monitoring and automatic reconnection
 
 ### Docker Security
 
