@@ -1,7 +1,7 @@
 from uuid import UUID
 from typing import List
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_, or_, update
 from sqlalchemy.orm import selectinload
@@ -16,6 +16,7 @@ from ..schemas.messaging import (
     ConversationCreate, ConversationUpdate, ConversationRead, ConversationWithMessages,
 )
 from ..models.messaging import Agent, Message, MessageRecipient, AgentMessageMetadata, Conversation
+from ..security import get_api_key
 
 
 router = APIRouter(prefix="", tags=["messaging"])
@@ -23,7 +24,7 @@ router = APIRouter(prefix="", tags=["messaging"])
 
 # Agents endpoints
 @router.post("/agents", response_model=AgentRead, status_code=status.HTTP_201_CREATED)
-async def create_agent(payload: AgentCreate):
+async def create_agent(payload: AgentCreate, api_key: str = Depends(get_api_key)):
     """Create a new agent"""
     async with db_manager.get_connection() as session:
         try:
@@ -41,7 +42,7 @@ async def create_agent(payload: AgentCreate):
 
 
 @router.put("/agents/{agent_id}", response_model=AgentRead)
-async def update_agent(agent_id: UUID, payload: AgentUpdate):
+async def update_agent(agent_id: UUID, payload: AgentUpdate, api_key: str = Depends(get_api_key)):
     """Update an existing agent"""
     async with db_manager.get_connection() as session:
         agent = await session.get(Agent, agent_id)
@@ -69,7 +70,7 @@ async def update_agent(agent_id: UUID, payload: AgentUpdate):
 
 # Messages endpoints
 @router.post("/messages", response_model=MessageRead, status_code=status.HTTP_201_CREATED)
-async def create_message(payload: MessageCreate):
+async def create_message(payload: MessageCreate, api_key: str = Depends(get_api_key)):
     """Create a new message"""
     async with db_manager.get_connection() as session:
         try:
@@ -87,7 +88,7 @@ async def create_message(payload: MessageCreate):
 
 
 @router.put("/messages/{message_id}", response_model=MessageRead)
-async def update_message(message_id: UUID, payload: MessageUpdate):
+async def update_message(message_id: UUID, payload: MessageUpdate, api_key: str = Depends(get_api_key)):
     """Update an existing message"""
     async with db_manager.get_connection() as session:
         message = await session.get(Message, message_id)
@@ -115,7 +116,7 @@ async def update_message(message_id: UUID, payload: MessageUpdate):
 
 # MessageRecipients endpoints (composite key handling)
 @router.post("/message_recipients", response_model=MessageRecipientRead, status_code=status.HTTP_201_CREATED)
-async def create_message_recipient(payload: MessageRecipientCreate):
+async def create_message_recipient(payload: MessageRecipientCreate, api_key: str = Depends(get_api_key)):
     """Create a new message recipient relationship"""
     async with db_manager.get_connection() as session:
         try:
@@ -133,7 +134,7 @@ async def create_message_recipient(payload: MessageRecipientCreate):
 
 
 @router.put("/message_recipients/{message_id}/{recipient_id}", response_model=MessageRecipientRead)
-async def update_message_recipient(message_id: UUID, recipient_id: UUID, payload: MessageRecipientUpdate):
+async def update_message_recipient(message_id: UUID, recipient_id: UUID, payload: MessageRecipientUpdate, api_key: str = Depends(get_api_key)):
     """Update an existing message recipient relationship (composite key)"""
     async with db_manager.get_connection() as session:
         recipient = await session.get(MessageRecipient, (message_id, recipient_id))
@@ -154,7 +155,7 @@ async def update_message_recipient(message_id: UUID, recipient_id: UUID, payload
 
 # AgentMessageMetadata endpoints
 @router.post("/agent_message_metadata", response_model=AgentMessageMetadataRead, status_code=status.HTTP_201_CREATED)
-async def create_agent_message_metadata(payload: AgentMessageMetadataCreate):
+async def create_agent_message_metadata(payload: AgentMessageMetadataCreate, api_key: str = Depends(get_api_key)):
     """Create new agent message metadata"""
     async with db_manager.get_connection() as session:
         try:
@@ -172,7 +173,7 @@ async def create_agent_message_metadata(payload: AgentMessageMetadataCreate):
 
 
 @router.put("/agent_message_metadata/{metadata_id}", response_model=AgentMessageMetadataRead)
-async def update_agent_message_metadata(metadata_id: UUID, payload: AgentMessageMetadataUpdate):
+async def update_agent_message_metadata(metadata_id: UUID, payload: AgentMessageMetadataUpdate, api_key: str = Depends(get_api_key)):
     """Update existing agent message metadata"""
     async with db_manager.get_connection() as session:
         metadata = await session.get(AgentMessageMetadata, metadata_id)
@@ -193,7 +194,7 @@ async def update_agent_message_metadata(metadata_id: UUID, payload: AgentMessage
 
 # Message pulling endpoints for Feature 3
 @router.get("/agents/{agent_id}/messages", response_model=List[MessageWithRecipientInfo])
-async def get_all_messages_for_agent(agent_id: UUID):
+async def get_all_messages_for_agent(agent_id: UUID, api_key: str = Depends(get_api_key)):
     """Get all messages by looking up by recipient_id in message_recipients for an agent"""
     async with db_manager.get_connection() as session:
         # Verify agent exists
@@ -238,7 +239,7 @@ async def get_all_messages_for_agent(agent_id: UUID):
 
 
 @router.get("/agents/{agent_id}/messages/unread", response_model=List[MessageWithRecipientInfo])
-async def get_unread_messages_for_agent(agent_id: UUID):
+async def get_unread_messages_for_agent(agent_id: UUID, api_key: str = Depends(get_api_key)):
     """Get all unread messages for a specific agent"""
     async with db_manager.get_connection() as session:
         # Verify agent exists
@@ -288,7 +289,7 @@ async def get_unread_messages_for_agent(agent_id: UUID):
 
 
 @router.get("/messages/{message_id}/metadata/{agent_id}", response_model=MessageMetadataWithAgent)
-async def get_message_metadata_with_agent(message_id: UUID, agent_id: UUID):
+async def get_message_metadata_with_agent(message_id: UUID, agent_id: UUID, api_key: str = Depends(get_api_key)):
     """Get message metadata and agent info - agent can only access their own messages"""
     async with db_manager.get_connection() as session:
         # Verify agent exists
@@ -373,7 +374,7 @@ async def get_message_metadata_with_agent(message_id: UUID, agent_id: UUID):
 
 
 @router.put("/agents/{agent_id}/messages/mark-read", response_model=MarkAsReadResponse)
-async def mark_messages_as_read(agent_id: UUID, payload: MarkAsReadRequest):
+async def mark_messages_as_read(agent_id: UUID, payload: MarkAsReadRequest, api_key: str = Depends(get_api_key)):
     """Mark all messages as read for an agent up to a specific date"""
     async with db_manager.get_connection() as session:
         # Verify agent exists
@@ -419,7 +420,7 @@ async def mark_messages_as_read(agent_id: UUID, payload: MarkAsReadRequest):
 
 # Conversation endpoints
 @router.post("/conversations", response_model=ConversationRead, status_code=status.HTTP_201_CREATED)
-async def create_conversation(payload: ConversationCreate):
+async def create_conversation(payload: ConversationCreate, api_key: str = Depends(get_api_key)):
     """Create a new conversation"""
     async with db_manager.get_connection() as session:
         try:
@@ -448,7 +449,7 @@ async def create_conversation(payload: ConversationCreate):
 
 
 @router.put("/conversations/{conversation_id}", response_model=ConversationRead)
-async def update_conversation(conversation_id: UUID, payload: ConversationUpdate):
+async def update_conversation(conversation_id: UUID, payload: ConversationUpdate, api_key: str = Depends(get_api_key)):
     """Update an existing conversation"""
     async with db_manager.get_connection() as session:
         conversation = await session.get(Conversation, conversation_id)
@@ -484,7 +485,7 @@ async def update_conversation(conversation_id: UUID, payload: ConversationUpdate
 
 
 @router.get("/conversations", response_model=List[ConversationRead])
-async def list_conversations():
+async def list_conversations(api_key: str = Depends(get_api_key)):
     """List all conversations"""
     async with db_manager.get_connection() as session:
         result = await session.execute(select(Conversation).order_by(Conversation.created_at.desc()))
@@ -505,7 +506,7 @@ async def list_conversations():
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationRead)
-async def get_conversation(conversation_id: UUID):
+async def get_conversation(conversation_id: UUID, api_key: str = Depends(get_api_key)):
     """Get a single conversation by ID"""
     async with db_manager.get_connection() as session:
         conversation = await session.get(Conversation, conversation_id)
@@ -527,7 +528,7 @@ async def get_conversation(conversation_id: UUID):
 
 
 @router.get("/conversations/{conversation_id}/details", response_model=ConversationWithMessages)
-async def get_conversation_details(conversation_id: UUID):
+async def get_conversation_details(conversation_id: UUID, api_key: str = Depends(get_api_key)):
     """Get comprehensive conversation info including all messages, agents, and metadata"""
     async with db_manager.get_connection() as session:
         # Get conversation

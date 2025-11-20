@@ -1,0 +1,1442 @@
+openapi: 3.0.3
+info:
+  title: FastAPI PostgreSQL Demo
+  description: |
+    A comprehensive FastAPI application that provides messaging capabilities between agents,
+    command-line interface operations, and user management with PostgreSQL backend.
+    
+    ## Features
+    - Agent management and messaging system
+    - Message threading and conversations
+    - Command-line interface integration
+    - User management
+    - Real-time message tracking with read receipts
+    
+    ## Security
+    This API implements various security measures:
+    - **Authentication**: API key-based authentication via X-API-Key header
+    - **Input validation and sanitization**: Comprehensive Pydantic model validation
+    - **SQL injection prevention**: Protected through SQLAlchemy ORM
+    - **Command injection prevention**: Secure shell escaping in CLI operations
+    - **Data privacy**: Agent access control and message isolation
+    - **Information disclosure protection**: Proper error handling and response sanitization
+    - **Transport security**: HTTPS required for production use
+    
+    **Important Security Notice:**
+    - This OpenAPI specification does NOT contain any actual API key values
+    - All sensitive information in examples has been redacted (marked with *************)
+    - API keys must be obtained through secure channels and stored securely
+    - Never commit API keys to version control or include in client-side code
+  version: 1.0.0
+  contact:
+    name: API Support
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:8000
+    description: Development server (HTTP allowed for local development only)
+  - url: https://api.example.com
+    description: Production server (HTTPS required)
+
+security:
+  - ApiKeyAuth: []
+
+paths:
+  /:
+    get:
+      tags:
+        - Root
+      summary: Root endpoint
+      description: Returns basic API information
+      operationId: root
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "FastAPI PostgreSQL Demo API"
+
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check endpoint
+      description: Returns the health status of the API
+      operationId: healthCheck
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: "healthy"
+
+  /users/{user_id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Retrieve a specific user from the database by their ID
+      operationId: getUser
+      parameters:
+        - name: user_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            minimum: 1
+          description: The ID of the user to retrieve
+      responses:
+        '200':
+          description: User found successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /agents:
+    post:
+      tags:
+        - Agents
+      summary: Create a new agent
+      description: Creates a new agent in the system
+      operationId: createAgent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCreate'
+      responses:
+        '201':
+          description: Agent created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRead'
+        '409':
+          description: Agent creation failed due to constraint violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /agents/{agent_id}:
+    put:
+      tags:
+        - Agents
+      summary: Update an existing agent
+      description: Updates an agent's information
+      operationId: updateAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the agent to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentUpdate'
+      responses:
+        '200':
+          description: Agent updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentRead'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '409':
+          description: Agent update failed due to constraint violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /messages:
+    post:
+      tags:
+        - Messages
+      summary: Create a new message
+      description: Creates a new message in the system
+      operationId: createMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageCreate'
+      responses:
+        '201':
+          description: Message created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageRead'
+        '409':
+          description: Message creation failed - sender agent may not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /messages/{message_id}:
+    put:
+      tags:
+        - Messages
+      summary: Update an existing message
+      description: Updates a message's content and metadata
+      operationId: updateMessage
+      parameters:
+        - name: message_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the message to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageUpdate'
+      responses:
+        '200':
+          description: Message updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageRead'
+        '404':
+          description: Message not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '409':
+          description: Message update failed due to constraint violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /message_recipients:
+    post:
+      tags:
+        - Message Recipients
+      summary: Create a new message recipient relationship
+      description: Creates a relationship between a message and its recipient
+      operationId: createMessageRecipient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRecipientCreate'
+      responses:
+        '201':
+          description: Message recipient relationship created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageRecipientRead'
+        '409':
+          description: Recipient relationship already exists or referenced entities not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /message_recipients/{message_id}/{recipient_id}:
+    put:
+      tags:
+        - Message Recipients
+      summary: Update message recipient relationship
+      description: Updates a message recipient relationship (composite key)
+      operationId: updateMessageRecipient
+      parameters:
+        - name: message_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the message
+        - name: recipient_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the recipient agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MessageRecipientUpdate'
+      responses:
+        '200':
+          description: Message recipient relationship updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageRecipientRead'
+        '404':
+          description: Message recipient relationship not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /agent_message_metadata:
+    post:
+      tags:
+        - Agent Message Metadata
+      summary: Create new agent message metadata
+      description: Creates metadata associated with a message
+      operationId: createAgentMessageMetadata
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentMessageMetadataCreate'
+      responses:
+        '201':
+          description: Agent message metadata created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentMessageMetadataRead'
+        '409':
+          description: Metadata creation failed - message may not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /agent_message_metadata/{metadata_id}:
+    put:
+      tags:
+        - Agent Message Metadata
+      summary: Update existing agent message metadata
+      description: Updates existing agent message metadata
+      operationId: updateAgentMessageMetadata
+      parameters:
+        - name: metadata_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the metadata to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentMessageMetadataUpdate'
+      responses:
+        '200':
+          description: Agent message metadata updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentMessageMetadataRead'
+        '404':
+          description: Agent message metadata not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /agents/{agent_id}/messages:
+    get:
+      tags:
+        - Message Pulling
+      summary: Get all messages for an agent
+      description: Retrieves all messages where the agent is a recipient
+      operationId: getAllMessagesForAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the agent
+      responses:
+        '200':
+          description: Messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 1000
+                items:
+                  $ref: '#/components/schemas/MessageWithRecipientInfo'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /agents/{agent_id}/messages/unread:
+    get:
+      tags:
+        - Message Pulling
+      summary: Get unread messages for an agent
+      description: Retrieves all unread messages for a specific agent
+      operationId: getUnreadMessagesForAgent
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the agent
+      responses:
+        '200':
+          description: Unread messages retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 1000
+                items:
+                  $ref: '#/components/schemas/MessageWithRecipientInfo'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /messages/{message_id}/metadata/{agent_id}:
+    get:
+      tags:
+        - Message Pulling
+      summary: Get message metadata with agent info
+      description: Get message metadata and agent info - agent can only access their own messages
+      operationId: getMessageMetadataWithAgent
+      parameters:
+        - name: message_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the message
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the agent
+      responses:
+        '200':
+          description: Message metadata with agent info retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageMetadataWithAgent'
+        '403':
+          description: Agent does not have access to this message
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '404':
+          description: Agent or message not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /agents/{agent_id}/messages/mark-read:
+    put:
+      tags:
+        - Message Pulling
+      summary: Mark messages as read
+      description: Mark all messages as read for an agent up to a specific date
+      operationId: markMessagesAsRead
+      parameters:
+        - name: agent_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the agent
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MarkAsReadRequest'
+      responses:
+        '200':
+          description: Messages marked as read successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkAsReadResponse'
+        '404':
+          description: Agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /conversations:
+    get:
+      tags:
+        - Conversations
+      summary: List all conversations
+      description: Retrieves all conversations in the system
+      operationId: listConversations
+      responses:
+        '200':
+          description: Conversations retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: array
+                maxItems: 500
+                items:
+                  $ref: '#/components/schemas/ConversationRead'
+      security:
+        - ApiKeyAuth: []
+
+    post:
+      tags:
+        - Conversations
+      summary: Create a new conversation
+      description: Creates a new conversation in the system
+      operationId: createConversation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationCreate'
+      responses:
+        '201':
+          description: Conversation created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationRead'
+        '409':
+          description: Conversation creation failed due to constraint violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /conversations/{conversation_id}:
+    get:
+      tags:
+        - Conversations
+      summary: Get a conversation by ID
+      description: Retrieves a specific conversation by its ID
+      operationId: getConversation
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the conversation
+      responses:
+        '200':
+          description: Conversation retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationRead'
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+    put:
+      tags:
+        - Conversations
+      summary: Update an existing conversation
+      description: Updates a conversation's information
+      operationId: updateConversation
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the conversation to update
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConversationUpdate'
+      responses:
+        '200':
+          description: Conversation updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationRead'
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '409':
+          description: Conversation update failed due to constraint violation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /conversations/{conversation_id}/details:
+    get:
+      tags:
+        - Conversations
+      summary: Get comprehensive conversation info
+      description: Get comprehensive conversation info including all messages, agents, and metadata
+      operationId: getConversationDetails
+      parameters:
+        - name: conversation_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: The UUID of the conversation
+      responses:
+        '200':
+          description: Conversation details retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConversationWithMessages'
+        '404':
+          description: Conversation not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+  /cli/echo:
+    post:
+      tags:
+        - CLI
+      summary: Echo a message to command line
+      description: |
+        Echo a message to the command line using subprocess.
+        This endpoint receives a message and executes an echo command
+        to output the message to the command line. The message is
+        validated for security to prevent shell injection attacks.
+      operationId: echoMessage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EchoRequest'
+      responses:
+        '200':
+          description: Echo command executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EchoResponse'
+        '408':
+          description: Command execution timed out
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+        '422':
+          description: Validation error - invalid message content
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationError'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPError'
+      security:
+        - ApiKeyAuth: []
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: |
+        API key for authentication. 
+        
+        **Security Notice:** 
+        - API keys should never be included in client-side code or version control
+        - Use environment variables or secure configuration management
+        - Rotate API keys regularly
+        - API keys MUST be transmitted over HTTPS only in production
+        - Example header: `X-API-Key: ************`
+        
+        **HTTPS Requirement:**
+        - All API requests MUST use HTTPS in production environments
+        - HTTP connections are rejected in production to prevent cleartext API key transmission
+        - Local development may use HTTP for testing purposes only
+        
+        **Note:** This specification does not contain actual API key values for security reasons.
+
+  schemas:
+    UserResponse:
+      type: object
+      required:
+        - id
+        - name
+        - email
+        - created_at
+      properties:
+        id:
+          type: integer
+          description: User ID
+          example: 1
+        name:
+          type: string
+          description: User name
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "john.doe@example.com"
+        created_at:
+          type: string
+          format: date-time
+          description: User creation timestamp
+          example: "2023-01-01T12:00:00Z"
+
+    AgentCreate:
+      type: object
+      required:
+        - agent_name
+      properties:
+        agent_name:
+          type: string
+          description: Name of the agent
+          example: "Agent Smith"
+        ip_address:
+          type: string
+          description: IP address of the agent
+          example: "192.168.1.100"
+          nullable: true
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          description: Port number
+          example: 8080
+          nullable: true
+
+    AgentUpdate:
+      type: object
+      properties:
+        agent_name:
+          type: string
+          description: Name of the agent
+          example: "Agent Smith Updated"
+          nullable: true
+        ip_address:
+          type: string
+          description: IP address of the agent
+          example: "192.168.1.101"
+          nullable: true
+        port:
+          type: integer
+          minimum: 1
+          maximum: 65535
+          description: Port number
+          example: 8081
+          nullable: true
+
+    AgentRead:
+      type: object
+      required:
+        - id
+        - agent_name
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Agent UUID
+          example: "123e4567-e89b-12d3-a456-426614174000"
+        agent_name:
+          type: string
+          description: Name of the agent
+          example: "Agent Smith"
+        ip_address:
+          type: string
+          description: IP address of the agent
+          example: "192.168.1.100"
+          nullable: true
+        port:
+          type: integer
+          description: Port number
+          example: 8080
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          description: Agent creation timestamp
+          example: "2023-01-01T12:00:00Z"
+          nullable: true
+
+    MessageCreate:
+      type: object
+      required:
+        - content
+      properties:
+        content:
+          type: string
+          description: Message content
+          example: "Hello, this is a test message"
+        sender_id:
+          type: string
+          format: uuid
+          description: Sender agent ID
+          example: "123e4567-e89b-12d3-a456-426614174000"
+          nullable: true
+        parent_message_id:
+          type: string
+          format: uuid
+          description: Parent message ID for threading
+          example: "123e4567-e89b-12d3-a456-426614174001"
+          nullable: true
+        conversation_id:
+          type: string
+          format: uuid
+          description: Conversation ID for grouping
+          example: "123e4567-e89b-12d3-a456-426614174002"
+          nullable: true
+        message_type:
+          type: string
+          description: Type of message
+          example: "text"
+          nullable: true
+        importance:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: Message importance (0-10)
+          example: 5
+          nullable: true
+        status:
+          type: string
+          description: Message status
+          example: "sent"
+          nullable: true
+        msg_metadata:
+          type: object
+          description: Additional metadata as JSON
+          example: {"tag": "urgent", "category": "support"}
+          nullable: true
+
+    MessageUpdate:
+      type: object
+      properties:
+        content:
+          type: string
+          description: Message content
+          example: "Updated message content"
+          nullable: true
+        parent_message_id:
+          type: string
+          format: uuid
+          description: Parent message ID for threading
+          example: "123e4567-e89b-12d3-a456-426614174001"
+          nullable: true
+        conversation_id:
+          type: string
+          format: uuid
+          description: Conversation ID for grouping
+          example: "123e4567-e89b-12d3-a456-426614174002"
+          nullable: true
+        message_type:
+          type: string
+          description: Type of message
+          example: "text"
+          nullable: true
+        importance:
+          type: integer
+          minimum: 0
+          maximum: 10
+          description: Message importance (0-10)
+          example: 7
+          nullable: true
+        status:
+          type: string
+          description: Message status
+          example: "delivered"
+          nullable: true
+        msg_metadata:
+          type: object
+          description: Additional metadata as JSON
+          example: {"tag": "resolved", "category": "support"}
+          nullable: true
+
+    MessageRead:
+      type: object
+      required:
+        - id
+        - content
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Message UUID
+          example: "123e4567-e89b-12d3-a456-426614174003"
+        sender_id:
+          type: string
+          format: uuid
+          description: Sender agent ID
+          example: "123e4567-e89b-12d3-a456-426614174000"
+          nullable: true
+        sent_at:
+          type: string
+          format: date-time
+          description: Message sent timestamp
+          example: "2023-01-01T12:00:00Z"
+          nullable: true
+        parent_message_id:
+          type: string
+          format: uuid
+          description: Parent message ID for threading
+          example: "123e4567-e89b-12d3-a456-426614174001"
+          nullable: true
+        conversation_id:
+          type: string
+          format: uuid
+          description: Conversation ID for grouping
+          example: "123e4567-e89b-12d3-a456-426614174002"
+          nullable: true
+        content:
+          type: string
+          description: Message content
+          example: "Hello, this is a test message"
+        message_type:
+          type: string
+          description: Type of message
+          example: "text"
+          nullable: true
+        importance:
+          type: integer
+          description: Message importance (0-10)
+          example: 5
+          nullable: true
+        status:
+          type: string
+          description: Message status
+          example: "sent"
+          nullable: true
+        msg_metadata:
+          type: object
+          description: Additional metadata as JSON
+          example: {"tag": "urgent", "category": "support"}
+          nullable: true
+
+    MessageRecipientCreate:
+      type: object
+      required:
+        - message_id
+        - recipient_id
+      properties:
+        message_id:
+          type: string
+          format: uuid
+          description: Message ID
+          example: "123e4567-e89b-12d3-a456-426614174003"
+        recipient_id:
+          type: string
+          format: uuid
+          description: Recipient agent ID
+          example: "123e4567-e89b-12d3-a456-426614174004"
+        is_read:
+          type: boolean
+          description: Whether the message has been read
+          example: false
+          nullable: true
+        read_at:
+          type: string
+          format: date-time
+          description: When the message was read
+          example: "2023-01-01T12:30:00Z"
+          nullable: true
+
+    MessageRecipientUpdate:
+      type: object
+      properties:
+        is_read:
+          type: boolean
+          description: Whether the message has been read
+          example: true
+          nullable: true
+        read_at:
+          type: string
+          format: date-time
+          description: When the message was read
+          example: "2023-01-01T12:30:00Z"
+          nullable: true
+
+    MessageRecipientRead:
+      type: object
+      required:
+        - message_id
+        - recipient_id
+      properties:
+        message_id:
+          type: string
+          format: uuid
+          description: Message ID
+          example: "123e4567-e89b-12d3-a456-426614174003"
+        recipient_id:
+          type: string
+          format: uuid
+          description: Recipient agent ID
+          example: "123e4567-e89b-12d3-a456-426614174004"
+        is_read:
+          type: boolean
+          description: Whether the message has been read
+          example: false
+          nullable: true
+        read_at:
+          type: string
+          format: date-time
+          description: When the message was read
+          example: "2023-01-01T12:30:00Z"
+          nullable: true
+
+    AgentMessageMetadataCreate:
+      type: object
+      required:
+        - key
+      properties:
+        message_id:
+          type: string
+          format: uuid
+          description: Message ID
+          example: "123e4567-e89b-12d3-a456-426614174003"
+          nullable: true
+        key:
+          type: string
+          description: Metadata key
+          example: "priority"
+        value:
+          type: string
+          description: Metadata value
+          example: "high"
+          nullable: true
+
+    AgentMessageMetadataUpdate:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Metadata key
+          example: "priority"
+          nullable: true
+        value:
+          type: string
+          description: Metadata value
+          example: "medium"
+          nullable: true
+
+    AgentMessageMetadataRead:
+      type: object
+      required:
+        - id
+        - key
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Metadata UUID
+          example: "123e4567-e89b-12d3-a456-426614174005"
+        message_id:
+          type: string
+          format: uuid
+          description: Message ID
+          example: "123e4567-e89b-12d3-a456-426614174003"
+          nullable: true
+        key:
+          type: string
+          description: Metadata key
+          example: "priority"
+        value:
+          type: string
+          description: Metadata value
+          example: "high"
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          description: Metadata creation timestamp
+          example: "2023-01-01T12:00:00Z"
+          nullable: true
+
+    MessageWithRecipientInfo:
+      allOf:
+        - $ref: '#/components/schemas/MessageRead'
+        - type: object
+          properties:
+            is_read:
+              type: boolean
+              description: Whether the message has been read by the recipient
+              example: false
+              nullable: true
+            read_at:
+              type: string
+              format: date-time
+              description: When the message was read by the recipient
+              example: "2023-01-01T12:30:00Z"
+              nullable: true
+
+    MessageMetadataWithAgent:
+      type: object
+      required:
+        - message_id
+        - message
+        - agent
+        - metadata_items
+      properties:
+        message_id:
+          type: string
+          format: uuid
+          description: Message ID
+          example: "123e4567-e89b-12d3-a456-426614174003"
+        message:
+          $ref: '#/components/schemas/MessageRead'
+        agent:
+          $ref: '#/components/schemas/AgentRead'
+        metadata_items:
+          type: array
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/AgentMessageMetadataRead'
+          description: List of metadata items for the message
+
+    MarkAsReadRequest:
+      type: object
+      required:
+        - read_up_to_date
+      properties:
+        read_up_to_date:
+          type: string
+          format: date-time
+          description: Mark all messages as read up to this date
+          example: "2023-01-01T12:00:00Z"
+
+    MarkAsReadResponse:
+      type: object
+      required:
+        - updated_count
+        - message
+      properties:
+        updated_count:
+          type: integer
+          description: Number of messages marked as read
+          example: 5
+        message:
+          type: string
+          description: Success message
+          example: "Marked 5 messages as read for agent 123e4567-e89b-12d3-a456-426614174000"
+
+    ConversationCreate:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Conversation title
+          example: "Project Discussion"
+          nullable: true
+        description:
+          type: string
+          description: Conversation description
+          example: "Discussion about the new project requirements"
+          nullable: true
+        archived:
+          type: boolean
+          description: Whether conversation is archived
+          example: false
+          nullable: true
+        metadata:
+          type: object
+          description: Additional metadata as JSON
+          example: {"category": "project", "priority": "high"}
+          nullable: true
+
+    ConversationUpdate:
+      type: object
+      properties:
+        title:
+          type: string
+          description: Conversation title
+          example: "Updated Project Discussion"
+          nullable: true
+        description:
+          type: string
+          description: Conversation description
+          example: "Updated discussion about the new project requirements"
+          nullable: true
+        archived:
+          type: boolean
+          description: Whether conversation is archived
+          example: true
+          nullable: true
+        metadata:
+          type: object
+          description: Additional metadata as JSON
+          example: {"category": "project", "priority": "medium"}
+          nullable: true
+
+    ConversationRead:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Conversation UUID
+          example: "123e4567-e89b-12d3-a456-426614174002"
+        created_at:
+          type: string
+          format: date-time
+          description: Conversation creation timestamp
+          example: "2023-01-01T10:00:00Z"
+          nullable: true
+        title:
+          type: string
+          description: Conversation title
+          example: "Project Discussion"
+          nullable: true
+        description:
+          type: string
+          description: Conversation description
+          example: "Discussion about the new project requirements"
+          nullable: true
+        archived:
+          type: boolean
+          description: Whether conversation is archived
+          example: false
+          nullable: true
+        conv_metadata:
+          type: object
+          description: Additional metadata as JSON
+          example: {"category": "project", "priority": "high"}
+          nullable: true
+
+    ConversationWithMessages:
+      allOf:
+        - $ref: '#/components/schemas/ConversationRead'
+        - type: object
+          required:
+            - messages
+            - unique_agents
+            - total_messages
+            - unread_count
+          properties:
+            messages:
+              type: array
+              maxItems: 1000
+              items:
+                $ref: '#/components/schemas/MessageRead'
+              description: All messages in the conversation
+            unique_agents:
+              type: array
+              maxItems: 50
+              items:
+                $ref: '#/components/schemas/AgentRead'
+              description: All agents involved in this conversation
+            total_messages:
+              type: integer
+              description: Total number of messages in conversation
+              example: 10
+            unread_count:
+              type: integer
+              description: Number of unread messages
+              example: 2
+
+    EchoRequest:
+      type: object
+      required:
+        - message
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 1000
+          pattern: '^[a-zA-Z0-9\s\.\,\!\?\-_]+$'
+          description: |
+            Message to echo to command line.
+            Only alphanumeric characters, spaces, and basic punctuation (.,!?-_) are allowed.
+          example: "Hello World!"
+
+    EchoResponse:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          description: Whether the echo command was successful
+          example: true
+        message:
+          type: string
+          description: The original message that was echoed
+          example: "Hello World!"
+        output:
+          type: string
+          description: Command output if available
+          example: "Hello World!"
+          nullable: true
+        error:
+          type: string
+          description: Error message if command failed
+          example: null
+          nullable: true
+
+    HTTPError:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: string
+          description: Error detail message
+          example: "Item not found"
+
+    ValidationError:
+      type: object
+      required:
+        - detail
+      properties:
+        detail:
+          type: array
+          maxItems: 20
+          items:
+            type: object
+            properties:
+              loc:
+                type: array
+                maxItems: 10
+                items:
+                  oneOf:
+                    - type: string
+                    - type: integer
+                description: Error location
+              msg:
+                type: string
+                description: Error message
+              type:
+                type: string
+                description: Error type
+          description: Validation error details
+
+tags:
+  - name: Root
+    description: Basic API information
+  - name: Health
+    description: Health check endpoints
+  - name: Users
+    description: User management operations
+  - name: Agents
+    description: Agent management operations
+  - name: Messages
+    description: Message management operations
+  - name: Message Recipients
+    description: Message recipient relationship management
+  - name: Agent Message Metadata
+    description: Message metadata management
+  - name: Message Pulling
+    description: Message retrieval and read status operations
+  - name: Conversations
+    description: Conversation management operations
+  - name: CLI
+    description: Command-line interface operations

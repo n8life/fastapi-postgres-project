@@ -141,7 +141,7 @@ class MessageMetadataWithAgent(BaseModel):
     message_id: UUID
     message: MessageRead
     agent: AgentRead
-    metadata_items: list[AgentMessageMetadataRead]
+    metadata_items: list[AgentMessageMetadataRead] = Field(..., max_length=100, description="List of metadata items for the message (max 100 items)")
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -187,8 +187,8 @@ class ConversationRead(ConversationBase):
 
 class ConversationWithMessages(ConversationRead):
     """Conversation with all related messages, agents, and metadata"""
-    messages: list[MessageRead]
-    unique_agents: list[AgentRead] = Field(..., description="All agents involved in this conversation")
+    messages: list[MessageRead] = Field(..., max_length=1000, description="All messages in the conversation (max 1000 messages)")
+    unique_agents: list[AgentRead] = Field(..., max_length=50, description="All agents involved in this conversation (max 50 agents)")
     total_messages: int = Field(..., description="Total number of messages in conversation")
     unread_count: int = Field(..., description="Number of unread messages")
     model_config = ConfigDict(from_attributes=True)

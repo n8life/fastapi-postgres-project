@@ -11,7 +11,12 @@ A simple FastAPI application that connects to a PostgreSQL database and provides
 - Environment-based configuration
 - Database connection pooling
 - Health check endpoint
-- CLI command execution with security validation
+- **Security Features:**
+  - API key authentication on all endpoints
+  - HTTPS enforcement in production
+  - Security headers middleware
+  - Input validation with array size limits
+  - Command injection prevention in CLI operations
 
 ## Project Structure
 
@@ -36,10 +41,99 @@ A simple FastAPI application that connects to a PostgreSQL database and provides
 │   └── test_cli.py                 # Feature 5: CLI command tests
 ├── docker-compose.yml   # Docker services configuration
 ├── Dockerfile          # FastAPI app container
+├── openapi.yaml        # OpenAPI 3.0.3 specification
 ├── pyproject.toml      # Project dependencies (uv)
 ├── uv.lock            # Lock file
 └── README.md
 ```
+
+## API Documentation
+
+### OpenAPI Specification
+
+This project includes a comprehensive OpenAPI 3.0.3 specification (`openapi.yaml`) that documents:
+
+- **All API endpoints** with detailed descriptions and examples
+- **Request/response schemas** with validation rules and data types
+- **Security requirements** including API key authentication
+- **Error responses** with proper HTTP status codes
+- **Data models** for all entities (Agents, Messages, Conversations, etc.)
+
+#### Viewing the API Documentation
+
+- **Interactive Swagger UI**: http://localhost:8000/docs
+- **ReDoc UI**: http://localhost:8000/redoc
+- **OpenAPI JSON**: http://localhost:8000/openapi.json
+- **Static OpenAPI YAML**: `openapi.yaml` in project root
+
+#### Security Features in OpenAPI Spec
+
+- API key authentication scheme documented
+- Input validation patterns and constraints
+- Secure examples with redacted sensitive information
+- Proper error handling documentation
+- Array size limits (maxItems) specified for all array schemas
+
+## Security
+
+This application implements comprehensive security measures to protect against common vulnerabilities:
+
+### Authentication
+- **API Key Authentication**: All endpoints require a valid API key via `X-API-Key` header
+- **Environment-based Configuration**: API keys are loaded from environment variables
+- **No Hardcoded Secrets**: All sensitive information is externalized
+
+### Transport Security
+- **HTTPS Enforcement**: Production deployments automatically redirect HTTP to HTTPS
+- **Security Headers**: Comprehensive security headers added to all responses:
+  - `X-Content-Type-Options: nosniff`
+  - `X-Frame-Options: DENY`
+  - `X-XSS-Protection: 1; mode=block`
+  - `Strict-Transport-Security: max-age=31536000; includeSubDomains`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Content-Security-Policy: default-src 'self'`
+
+### Input Validation
+- **Array Size Limits**: All array inputs have maximum size constraints:
+  - Messages: 1000 items maximum
+  - Agents: 50 items maximum per conversation
+  - Metadata: 100 items maximum
+  - Error details: 20 items maximum
+- **Command Injection Prevention**: CLI endpoints use `shlex.quote()` for safe shell escaping
+- **Pydantic Validation**: Comprehensive input validation with type checking
+
+### Configuration
+
+Security settings can be configured via environment variables:
+
+```bash
+# Required: Set a strong API key
+API_KEY="your-secure-api-key-here"
+
+# Optional: HTTPS enforcement (default: true in production)
+ENFORCE_HTTPS="true"
+
+# Optional: API key requirement (default: true)
+REQUIRE_API_KEY="true"
+```
+
+### Security Best Practices
+
+1. **API Key Management**:
+   - Use strong, randomly generated API keys
+   - Rotate API keys regularly
+   - Store API keys in secure environment variables
+   - Never commit API keys to version control
+
+2. **HTTPS Configuration**:
+   - Always use HTTPS in production
+   - Configure proper SSL/TLS certificates
+   - Use HTTP only for local development
+
+3. **Monitoring and Logging**:
+   - Monitor for failed authentication attempts
+   - Log security-related events
+   - Implement rate limiting if needed
 
 ## API Endpoints
 
@@ -97,9 +191,10 @@ The application provides a comprehensive messaging system with the following ent
 ```bash
 curl -X POST http://localhost:8000/agents \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
   -d '{
     "agent_name": "ChatBot-1",
-    "ip_address": "192.168.1.100",
+    "ip_address": "*************",
     "port": 8080
   }'
 ```
@@ -108,6 +203,7 @@ curl -X POST http://localhost:8000/agents \
 ```bash
 curl -X POST http://localhost:8000/messages \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
   -d '{
     "content": "Hello, this is a test message!",
     "sender_id": "agent-uuid-here",
@@ -119,17 +215,21 @@ curl -X POST http://localhost:8000/messages \
 **Pull Messages for an Agent:**
 ```bash
 # Get all messages for an agent (sent and received)
-curl -X GET http://localhost:8000/agents/{agent_id}/messages
+curl -X GET http://localhost:8000/agents/{agent_id}/messages \
+  -H "X-API-Key: your-api-key-here"
 
 # Get only unread messages for an agent
-curl -X GET http://localhost:8000/agents/{agent_id}/messages/unread
+curl -X GET http://localhost:8000/agents/{agent_id}/messages/unread \
+  -H "X-API-Key: your-api-key-here"
 
 # Get message metadata with agent access control
-curl -X GET http://localhost:8000/messages/{message_id}/metadata/{agent_id}
+curl -X GET http://localhost:8000/messages/{message_id}/metadata/{agent_id} \
+  -H "X-API-Key: your-api-key-here"
 
 # Mark messages as read up to a specific date
 curl -X PUT http://localhost:8000/agents/{agent_id}/messages/mark-read \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
   -d '{"read_up_to_date": "2024-01-01T12:00:00Z"}'
 ```
 
@@ -137,6 +237,7 @@ curl -X PUT http://localhost:8000/agents/{agent_id}/messages/mark-read \
 ```bash
 curl -X POST http://localhost:8000/conversations \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
   -d '{
     "title": "Project Discussion",
     "description": "Discussion about the new features",
@@ -148,13 +249,16 @@ curl -X POST http://localhost:8000/conversations \
 **Get Conversation Details:**
 ```bash
 # Get comprehensive conversation information
-curl -X GET http://localhost:8000/conversations/{conversation_id}/details
+curl -X GET http://localhost:8000/conversations/{conversation_id}/details \
+  -H "X-API-Key: your-api-key-here"
 
 # Get just conversation metadata
-curl -X GET http://localhost:8000/conversations/{conversation_id}
+curl -X GET http://localhost:8000/conversations/{conversation_id} \
+  -H "X-API-Key: your-api-key-here"
 
 # List all conversations
-curl -X GET http://localhost:8000/conversations
+curl -X GET http://localhost:8000/conversations \
+  -H "X-API-Key: your-api-key-here"
 ```
 
 **Execute CLI Commands:**
@@ -162,6 +266,7 @@ curl -X GET http://localhost:8000/conversations
 # Echo a message to the command line
 curl -X POST http://localhost:8000/cli/echo \
   -H "Content-Type: application/json" \
+  -H "X-API-Key: your-api-key-here" \
   -d '{
     "message": "Hello from the API!"
   }'
@@ -201,6 +306,7 @@ Messages support threading via `parent_message_id` and conversation grouping via
    - API: http://localhost:8000
    - Interactive docs: http://localhost:8000/docs
    - ReDoc docs: http://localhost:8000/redoc
+   - OpenAPI specification: `openapi.yaml` (comprehensive API documentation)
 
 4. **Test the endpoints:**
    ```bash

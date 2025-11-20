@@ -1,8 +1,9 @@
 import subprocess
 import shlex
 import logging
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from ..schemas.cli import EchoRequest, EchoResponse
+from ..security import get_api_key
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -11,7 +12,7 @@ router = APIRouter(prefix="/cli", tags=["cli"])
 
 
 @router.post("/echo", response_model=EchoResponse)
-async def echo_message(payload: EchoRequest):
+async def echo_message(payload: EchoRequest, api_key: str = Depends(get_api_key)):
     """
     Echo a message to the command line using subprocess.
     
