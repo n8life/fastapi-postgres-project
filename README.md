@@ -36,10 +36,38 @@ A simple FastAPI application that connects to a PostgreSQL database and provides
 │   └── test_cli.py                 # Feature 5: CLI command tests
 ├── docker-compose.yml   # Docker services configuration
 ├── Dockerfile          # FastAPI app container
+├── openapi.yaml        # OpenAPI 3.0.3 specification
 ├── pyproject.toml      # Project dependencies (uv)
 ├── uv.lock            # Lock file
 └── README.md
 ```
+
+## API Documentation
+
+### OpenAPI Specification
+
+This project includes a comprehensive OpenAPI 3.0.3 specification (`openapi.yaml`) that documents:
+
+- **All API endpoints** with detailed descriptions and examples
+- **Request/response schemas** with validation rules and data types
+- **Security requirements** including API key authentication
+- **Error responses** with proper HTTP status codes
+- **Data models** for all entities (Agents, Messages, Conversations, etc.)
+
+#### Viewing the API Documentation
+
+- **Interactive Swagger UI**: http://localhost:8000/docs
+- **ReDoc UI**: http://localhost:8000/redoc
+- **OpenAPI JSON**: http://localhost:8000/openapi.json
+- **Static OpenAPI YAML**: `openapi.yaml` in project root
+
+#### Security Features in OpenAPI Spec
+
+- API key authentication scheme documented
+- Input validation patterns and constraints
+- Secure examples with redacted sensitive information
+- Proper error handling documentation
+- Rate limiting and security considerations
 
 ## API Endpoints
 
@@ -201,6 +229,7 @@ Messages support threading via `parent_message_id` and conversation grouping via
    - API: http://localhost:8000
    - Interactive docs: http://localhost:8000/docs
    - ReDoc docs: http://localhost:8000/redoc
+   - OpenAPI specification: `openapi.yaml` (comprehensive API documentation)
 
 4. **Test the endpoints:**
    ```bash
