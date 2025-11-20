@@ -14,10 +14,19 @@ info:
     
     ## Security
     This API implements various security measures:
-    - Input validation and sanitization
-    - SQL injection prevention through ORM
-    - Command injection prevention in CLI operations
-    - Proper error handling to prevent information disclosure
+    - **Authentication**: API key-based authentication via X-API-Key header
+    - **Input validation and sanitization**: Comprehensive Pydantic model validation
+    - **SQL injection prevention**: Protected through SQLAlchemy ORM
+    - **Command injection prevention**: Secure shell escaping in CLI operations
+    - **Data privacy**: Agent access control and message isolation
+    - **Information disclosure protection**: Proper error handling and response sanitization
+    - **Transport security**: HTTPS required for production use
+    
+    **Important Security Notice:**
+    - This OpenAPI specification does NOT contain any actual API key values
+    - All sensitive information in examples has been redacted (marked with *************)
+    - API keys must be obtained through secure channels and stored securely
+    - Never commit API keys to version control or include in client-side code
   version: 1.0.0
   contact:
     name: API Support
@@ -735,7 +744,17 @@ components:
       type: apiKey
       in: header
       name: X-API-Key
-      description: API key for authentication
+      description: |
+        API key for authentication. 
+        
+        **Security Notice:** 
+        - API keys should never be included in client-side code or version control
+        - Use environment variables or secure configuration management
+        - Rotate API keys regularly
+        - API keys must be transmitted over HTTPS only
+        - Example header: `X-API-Key: your-secure-api-key-here`
+        
+        **Note:** This specification does not contain actual API key values for security reasons.
 
   schemas:
     UserResponse:
