@@ -43,16 +43,16 @@ spec:
           value: "testdb"
         - name: POSTGRES_USER
           value: "postgres"
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: password
+        - name: POSTGRES_PASSWORD_FILE
+          value: "/var/secrets/postgres/password"
         - name: PGDATA
           value: /var/lib/postgresql/data/pgdata
         volumeMounts:
         - name: postgres-storage
           mountPath: /var/lib/postgresql/data
+        - name: postgres-secrets
+          mountPath: /var/secrets/postgres
+          readOnly: true
         livenessProbe:
           exec:
             command:
@@ -84,4 +84,11 @@ spec:
       - name: postgres-storage
         persistentVolumeClaim:
           claimName: postgres-pvc
+      - name: postgres-secrets
+        secret:
+          secretName: postgres-secret
+          defaultMode: 0400
+          items:
+          - key: password
+            path: password
       restartPolicy: Always

@@ -13,6 +13,17 @@ from sqlalchemy.ext.asyncio import (
 from .models import Base, User
 
 
+def read_secret_file(file_path: str) -> str:
+    """Read secret from file, stripping whitespace"""
+    try:
+        with open(file_path, 'r') as f:
+            return f.read().strip()
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Secret file not found: {file_path}")
+    except Exception as e:
+        raise RuntimeError(f"Error reading secret file {file_path}: {e}")
+
+
 class DatabaseManager:
     def __init__(self):
         self.engine: Optional[AsyncEngine] = None
@@ -20,10 +31,32 @@ class DatabaseManager:
 
     async def create_pool(self):
         """Create database connection pool"""
-        database_url = os.getenv(
-            "DATABASE_URL",
-            "postgresql+asyncpg://postgres:************@localhost:5432/testdb"
-        )
+        # Try to read password from file first (for Kubernetes/production)
+        postgres_password = None
+        postgres_password_file = os.getenv("POSTGRES_PASSWORD_FILE")
+        if postgres_password_file:
+            try:
+                postgres_password = read_secret_file(postgres_password_file)
+            except Exception as e:
+                print(f"Warning: Could not read password from file {postgres_password_file}: {e}")
+        
+        # Fall back to environment variable
+        if not postgres_password:
+            postgres_password = os.getenv("POSTGRES_PASSWORD")
+        
+        # Build database URL
+        database_url = os.getenv("DATABASE_URL")
+        if not database_url:
+            # Construct URL with file-based or env-based password
+            if postgres_password:
+                db_host = os.getenv("DB_HOST", "localhost")
+                db_port = os.getenv("DB_PORT", "5432")
+                db_name = os.getenv("DB_NAME", "testdb")
+                db_user = os.getenv("DB_USER", "postgres")
+                database_url = f"postgresql+asyncpg://{db_user}:{postgres_password}@{db_host}:{db_port}/{db_name}"
+            else:
+                # Final fallback for development
+                database_url = "postgresql+asyncpg://postgres:************@localhost:5432/testdb"
         self.engine = create_async_engine(
             database_url,
             pool_pre_ping=True,

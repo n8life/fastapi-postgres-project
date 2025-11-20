@@ -55,3 +55,8 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# Kubernetes Secrets (keep examples, exclude actual secrets)
+k8s/*secret*.yaml
+!k8s/*secret*.yaml.example
+!k8s/postgres-secret.yaml

@@ -44,14 +44,20 @@ spec:
           mountPath: /tmp
         - name: app-cache
           mountPath: /home/nonroot/.cache
+        - name: postgres-secrets
+          mountPath: /var/secrets/postgres
+          readOnly: true
         env:
-        - name: DATABASE_URL
-          value: "postgresql+asyncpg://postgres:$(POSTGRES_PASSWORD)@postgres-service:5432/testdb"
-        - name: POSTGRES_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: postgres-secret
-              key: password
+        - name: POSTGRES_PASSWORD_FILE
+          value: "/var/secrets/postgres/password"
+        - name: DB_HOST
+          value: "postgres-service"
+        - name: DB_PORT
+          value: "5432"
+        - name: DB_NAME
+          value: "testdb"
+        - name: DB_USER
+          value: "postgres"
         livenessProbe:
           httpGet:
             path: /
@@ -80,4 +86,11 @@ spec:
         emptyDir: {}
       - name: app-cache
         emptyDir: {}
+      - name: postgres-secrets
+        secret:
+          secretName: postgres-secret
+          defaultMode: 0400
+          items:
+          - key: password
+            path: password
       restartPolicy: Always
