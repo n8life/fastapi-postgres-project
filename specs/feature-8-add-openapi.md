@@ -17,6 +17,7 @@
 - Create an OpenAPI specification document for the application
 -- Use for reference: https://spec.openapis.org/oas/latest.html
 -- Make sure it is a secure specification.
+-- Make sure the API key is not sent over in cleartext in the openapi.yaml file.
 
 ## Requirements Per Task
 - Think, validate, and test all work inside docker-compose environment do not run tests locally for the fastapi application
