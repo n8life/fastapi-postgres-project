@@ -91,11 +91,22 @@ async def get_file_content(filename: str, api_key: str = Depends(get_api_key)):
         )
     
     except ValueError as e:
-        logger.error(f"Error reading file {filename}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        error_msg = str(e)
+        if any(pattern in error_msg for pattern in [
+            "Path traversal detected", "Invalid filename", 
+            "Hidden files are not allowed", "Filename contains null bytes"
+        ]):
+            logger.warning(f"Security violation attempt - {error_msg}: {filename}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid filename"
+            )
+        else:
+            logger.error(f"Error reading file {filename}: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
     
     except Exception as e:
         logger.error(f"Unexpected error reading file {filename}: {str(e)}")
@@ -136,11 +147,22 @@ async def process_file(request: ProcessFileRequest, api_key: str = Depends(get_a
         )
     
     except ValueError as e:
-        logger.error(f"Error processing file {request.filename}: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+        error_msg = str(e)
+        if any(pattern in error_msg for pattern in [
+            "Path traversal detected", "Invalid filename", 
+            "Hidden files are not allowed", "Filename contains null bytes"
+        ]):
+            logger.warning(f"Security violation attempt - {error_msg}: {request.filename}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid filename"
+            )
+        else:
+            logger.error(f"Error processing file {request.filename}: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
     
     except Exception as e:
         logger.error(f"Unexpected error processing file {request.filename}: {str(e)}")
@@ -214,8 +236,8 @@ async def delete_file(filename: str, api_key: str = Depends(get_api_key)):
     try:
         logger.info(f"Attempting to delete file: {filename}")
         
-        # Get file path
-        file_path = issues_service.issues_dir / filename
+        # Get secure file path (this validates the filename)
+        file_path = issues_service._get_secure_file_path(filename)
         
         if not file_path.exists():
             raise HTTPException(
@@ -228,6 +250,24 @@ async def delete_file(filename: str, api_key: str = Depends(get_api_key)):
         logger.info(f"Successfully deleted file: {filename}")
         
         return {"message": f"File '{filename}' deleted successfully"}
+    
+    except ValueError as e:
+        error_msg = str(e)
+        if any(pattern in error_msg for pattern in [
+            "Path traversal detected", "Invalid filename", 
+            "Hidden files are not allowed", "Filename contains null bytes"
+        ]):
+            logger.warning(f"Security violation attempt - {error_msg}: {filename}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid filename"
+            )
+        else:
+            logger.error(f"Error deleting file {filename}: {error_msg}")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=error_msg
+            )
     
     except HTTPException:
         raise

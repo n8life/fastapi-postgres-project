@@ -3,6 +3,7 @@ Service module for handling issues files from the issues directory.
 """
 import json
 import csv
+import os
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -16,6 +17,65 @@ class IssuesService:
     
     def __init__(self):
         self.issues_dir = Path(__file__).parent.parent.parent / "issues"
+        # Resolve to absolute path for security checks
+        self.issues_dir = self.issues_dir.resolve()
+    
+    def _validate_filename(self, filename: str) -> str:
+        """
+        Validate and sanitize filename to prevent path traversal attacks.
+        
+        Args:
+            filename: The filename to validate
+            
+        Returns:
+            str: The sanitized filename
+            
+        Raises:
+            ValueError: If filename contains invalid characters or path traversal attempts
+        """
+        if not filename or not isinstance(filename, str):
+            raise ValueError("Filename must be a non-empty string")
+        
+        # Remove any path separators and normalize
+        clean_filename = os.path.basename(filename.strip())
+        
+        # Check for empty filename after cleaning
+        if not clean_filename or clean_filename in ('.', '..'):
+            raise ValueError("Invalid filename")
+        
+        # Check for null bytes and other dangerous characters
+        if '\x00' in clean_filename:
+            raise ValueError("Filename contains null bytes")
+        
+        # Additional security: ensure filename doesn't start with dots (hidden files)
+        if clean_filename.startswith('.'):
+            raise ValueError("Hidden files are not allowed")
+        
+        return clean_filename
+    
+    def _get_secure_file_path(self, filename: str) -> Path:
+        """
+        Get a secure file path within the issues directory.
+        
+        Args:
+            filename: The filename to get path for
+            
+        Returns:
+            Path: The secure file path
+            
+        Raises:
+            ValueError: If path traversal is detected
+        """
+        clean_filename = self._validate_filename(filename)
+        file_path = (self.issues_dir / clean_filename).resolve()
+        
+        # Ensure the resolved path is still within the issues directory
+        try:
+            file_path.relative_to(self.issues_dir)
+        except ValueError:
+            raise ValueError(f"Path traversal detected: {filename}")
+        
+        return file_path
     
     def get_issues_files(self) -> List[Dict[str, Any]]:
         """Get list of files in the issues directory with metadata."""
@@ -48,7 +108,8 @@ class IssuesService:
     
     def read_file_content(self, filename: str) -> Dict[str, Any]:
         """Read and parse content from a specific file."""
-        file_path = self.issues_dir / filename
+        # Use secure path validation
+        file_path = self._get_secure_file_path(filename)
         
         if not file_path.exists():
             raise FileNotFoundError(f"File {filename} not found in issues directory")
@@ -138,8 +199,11 @@ class IssuesService:
     
     async def create_message_from_file(self, filename: str) -> Dict[str, Any]:
         """Create a message record from a file in the issues directory."""
-        # Read file content
-        file_data = self.read_file_content(filename)
+        # Validate filename first for early error detection
+        clean_filename = self._validate_filename(filename)
+        
+        # Read file content (this will also validate the path)
+        file_data = self.read_file_content(clean_filename)
         
         # Create or get agent for system/issues processing
         agent = await self._get_or_create_issues_agent()
