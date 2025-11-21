@@ -57,3 +57,4 @@ Thumbs.db
 logs/
 
 set_env.sh
+issues/**
