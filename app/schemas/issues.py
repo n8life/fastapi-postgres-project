@@ -3,8 +3,6 @@ Pydantic schemas for issues endpoints.
 """
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
-from datetime import datetime
-
 
 class IssueFileInfo(BaseModel):
     """Information about a file in the issues directory."""

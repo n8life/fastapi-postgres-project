@@ -1,10 +1,8 @@
 """
 Service module for handling issues files from the issues directory.
 """
-import os
 import json
 import csv
-import uuid
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime

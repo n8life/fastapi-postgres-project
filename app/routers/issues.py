@@ -1,7 +1,6 @@
 """
 Issues router for handling files in the issues directory.
 """
-from typing import List
 from fastapi import APIRouter, HTTPException, Depends, status
 import logging
 
@@ -13,7 +12,6 @@ from ..schemas.issues import (
     ProcessFileRequest, 
     ProcessedFileResponse,
     FileContentResponse,
-    ErrorResponse,
     ProcessAllFilesResponse
 )
 
