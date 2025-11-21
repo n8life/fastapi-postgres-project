@@ -5,6 +5,7 @@ from .database import db_manager, get_user_by_id
 from .routers.messaging import router as messaging_router
 from .routers.cli import router as cli_router
 from .routers.s3 import router as s3_router
+from .routers.issues import router as issues_router
 from .security import (
     get_api_key, 
     HTTPSEnforcementMiddleware, 
@@ -50,6 +51,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(messaging_router)
 app.include_router(cli_router)
 app.include_router(s3_router)
+app.include_router(issues_router)
 
 
 @app.get("/")

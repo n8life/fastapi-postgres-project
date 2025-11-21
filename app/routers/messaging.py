@@ -4,7 +4,6 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select, and_, or_, update
-from sqlalchemy.orm import selectinload
 
 from ..database import db_manager
 from ..schemas.messaging import (
@@ -33,7 +32,7 @@ async def create_agent(payload: AgentCreate, api_key: str = Depends(get_api_key)
             await session.commit()
             await session.refresh(agent)
             return agent
-        except IntegrityError as e:
+        except IntegrityError:
             await session.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -440,7 +439,7 @@ async def create_conversation(payload: ConversationCreate, api_key: str = Depend
                 archived=conversation.archived,
                 conv_metadata=conversation.conv_metadata
             )
-        except IntegrityError as e:
+        except IntegrityError:
             await session.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

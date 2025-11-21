@@ -5,6 +5,9 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://postgres:password@db:5432/testdb
+      - API_KEY=test-api-key-123
+      - REQUIRE_API_KEY=true
+      - ENFORCE_HTTPS=false
     depends_on:
       db:
         condition: service_healthy
