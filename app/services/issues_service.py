@@ -10,7 +10,7 @@ from datetime import datetime
 
 from ..database import db_manager
 from ..models.messaging import Message, Conversation, Agent, MessageRecipient
-from sqlalchemy import select, func
+from sqlalchemy import select
 
 
 class IssuesService:
