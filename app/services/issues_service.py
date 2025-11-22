@@ -9,7 +9,8 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 
 from ..database import db_manager
-from ..models.messaging import Message, Conversation, Agent
+from ..models.messaging import Message, Conversation, Agent, MessageRecipient
+from sqlalchemy import select
 
 
 class IssuesService:
@@ -291,6 +292,184 @@ class IssuesService:
                 await session.commit()
                 await session.refresh(conversation)
             
+            return conversation
+    
+    def get_most_recent_file(self) -> Optional[Dict[str, Any]]:
+        """Get the most recent file from the issues directory based on modification time."""
+        if not self.issues_dir.exists():
+            return None
+        
+        most_recent_file = None
+        most_recent_time = 0
+        
+        for file_path in self.issues_dir.iterdir():
+            if file_path.is_file() and not file_path.name.startswith('.'):
+                stat_info = file_path.stat()
+                if stat_info.st_mtime > most_recent_time:
+                    most_recent_time = stat_info.st_mtime
+                    most_recent_file = {
+                        "filename": file_path.name,
+                        "file_path": str(file_path),
+                        "size": stat_info.st_size,
+                        "modified": datetime.fromtimestamp(stat_info.st_mtime).isoformat(),
+                        "file_type": self._get_file_type(file_path.name)
+                    }
+        
+        return most_recent_file
+    
+    async def _get_agent_by_name(self, agent_name: str) -> Optional[Agent]:
+        """Get agent by agent name."""
+        async with db_manager.get_connection() as session:
+            result = await session.execute(
+                select(Agent).where(Agent.agent_name == agent_name)
+            )
+            return result.scalar_one_or_none()
+    
+    async def _get_current_agent(self) -> Agent:
+        """Get the current agent based on AGENT_NAME environment variable."""
+        agent_name = os.getenv("AGENT_NAME", "task_assigner")
+        
+        # Try to find existing agent
+        agent = await self._get_agent_by_name(agent_name)
+        
+        if not agent:
+            # Create the agent if it doesn't exist
+            async with db_manager.get_connection() as session:
+                agent = Agent(
+                    agent_name=agent_name,
+                    ip_address=None,
+                    port=None
+                )
+                session.add(agent)
+                await session.commit()
+                await session.refresh(agent)
+        
+        return agent
+    
+    async def _get_recipient_agent(self, exclude_agent_id: str) -> Optional[Agent]:
+        """Get an agent to assign as recipient, excluding the sender agent."""
+        async with db_manager.get_connection() as session:
+            result = await session.execute(
+                select(Agent).where(Agent.id != exclude_agent_id)
+            )
+            agents = result.scalars().all()
+            
+            # Return the first available agent that's not the sender
+            if agents:
+                return agents[0]
+            
+            # If no other agents exist, create a default recipient agent
+            recipient_agent = Agent(
+                agent_name="default_recipient",
+                ip_address=None,
+                port=None
+            )
+            session.add(recipient_agent)
+            await session.commit()
+            await session.refresh(recipient_agent)
+            return recipient_agent
+    
+    async def assign_task_from_recent_file(self) -> Dict[str, Any]:
+        """Assign a task from the most recent file to an agent."""
+        # Get the most recent file
+        recent_file = self.get_most_recent_file()
+        if not recent_file:
+            raise FileNotFoundError("No files found in issues directory")
+        
+        filename = recent_file["filename"]
+        
+        # Read file content
+        file_data = self.read_file_content(filename)
+        
+        # Get current agent (sender)
+        sender_agent = await self._get_current_agent()
+        
+        # Get recipient agent (different from sender)
+        recipient_agent = await self._get_recipient_agent(sender_agent.id)
+        
+        if not recipient_agent:
+            raise ValueError("Unable to find or create recipient agent")
+        
+        # Create a new conversation for this task
+        conversation = await self._create_task_conversation(filename)
+        
+        # Create message content
+        message_content = self._format_message_content(file_data)
+        
+        # Create message record with recipient assignment
+        async with db_manager.get_connection() as session:
+            # Create the message
+            message = Message(
+                sender_id=sender_agent.id,
+                conversation_id=conversation.id,
+                content=message_content,
+                message_type="task_assignment",
+                importance=7,
+                status="assigned",
+                msg_metadata={
+                    "source_file": filename,
+                    "file_type": file_data.get("file_type"),
+                    "processed_at": datetime.utcnow().isoformat(),
+                    "assigned_to": str(recipient_agent.id),
+                    "original_data": file_data
+                }
+            )
+            
+            session.add(message)
+            await session.commit()
+            await session.refresh(message)
+            
+            # Create message recipient relationship
+            message_recipient = MessageRecipient(
+                message_id=message.id,
+                recipient_id=recipient_agent.id,
+                is_read=False
+            )
+            
+            session.add(message_recipient)
+            await session.commit()
+            
+            # Delete the processed file
+            file_deleted = False
+            try:
+                file_path = self._get_secure_file_path(filename)
+                file_path.unlink()
+                file_deleted = True
+            except Exception as e:
+                # Log error but don't fail the entire operation
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Failed to delete file {filename}: {str(e)}")
+            
+            return {
+                "message_id": str(message.id),
+                "conversation_id": str(conversation.id),
+                "filename": filename,
+                "sender_agent": sender_agent.agent_name,
+                "recipient_agent": recipient_agent.agent_name,
+                "message_type": message.message_type,
+                "created_at": message.sent_at.isoformat() if message.sent_at else None,
+                "content_preview": message_content[:200] + "..." if len(message_content) > 200 else message_content,
+                "file_deleted": file_deleted
+            }
+    
+    async def _create_task_conversation(self, filename: str) -> Conversation:
+        """Create a new conversation for a task assignment."""
+        async with db_manager.get_connection() as session:
+            conversation = Conversation(
+                title=f"Task Assignment: {filename}",
+                description=f"Task assignment created from processing file: {filename}",
+                archived=False,
+                conv_metadata={
+                    "purpose": "task_assignment",
+                    "source_file": filename,
+                    "created_by": "system",
+                    "created_at": datetime.utcnow().isoformat()
+                }
+            )
+            session.add(conversation)
+            await session.commit()
+            await session.refresh(conversation)
             return conversation
     
     def _format_message_content(self, file_data: Dict[str, Any]) -> str:

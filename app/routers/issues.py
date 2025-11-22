@@ -12,7 +12,8 @@ from ..schemas.issues import (
     ProcessFileRequest, 
     ProcessedFileResponse,
     FileContentResponse,
-    ProcessAllFilesResponse
+    ProcessAllFilesResponse,
+    AssignTaskResponse
 )
 
 logger = logging.getLogger(__name__)
@@ -219,6 +220,60 @@ async def process_all_files(api_key: str = Depends(get_api_key)):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to process files: {str(e)}"
+        )
+
+
+@router.post("/assign-task", response_model=AssignTaskResponse)
+async def assign_task(api_key: str = Depends(get_api_key)):
+    """
+    Assign a task from the most recent file in the issues directory.
+    
+    This endpoint:
+    - Finds the most recent file based on modification time
+    - Creates a new conversation for the task
+    - Creates a message with the AGENT_NAME agent as sender
+    - Assigns the task to a different agent via message-recipient relationship
+    - Deletes the processed file after successful assignment
+    
+    Returns:
+        AssignTaskResponse with details about the created task assignment
+    """
+    try:
+        logger.info("Assigning task from most recent file")
+        result = await issues_service.assign_task_from_recent_file()
+        
+        return AssignTaskResponse(
+            message_id=result["message_id"],
+            conversation_id=result["conversation_id"],
+            filename=result["filename"],
+            sender_agent=result["sender_agent"],
+            recipient_agent=result["recipient_agent"],
+            message_type=result["message_type"],
+            created_at=result["created_at"],
+            content_preview=result["content_preview"],
+            file_deleted=result["file_deleted"]
+        )
+    
+    except FileNotFoundError as e:
+        logger.warning(f"No files found for task assignment: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No files found in issues directory for task assignment"
+        )
+    
+    except ValueError as e:
+        error_msg = str(e)
+        logger.error(f"Error during task assignment: {error_msg}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_msg
+        )
+    
+    except Exception as e:
+        logger.error(f"Unexpected error during task assignment: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to assign task: {str(e)}"
         )
 
 
