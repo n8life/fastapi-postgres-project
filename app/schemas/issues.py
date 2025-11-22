@@ -76,3 +76,16 @@ class ProcessAllFilesResponse(BaseModel):
     processed_files: List[ProcessedFileResponse] = Field(..., description="List of processed files")
     total_processed: int = Field(..., description="Total number of files processed")
     errors: List[Dict[str, str]] = Field(default_factory=list, description="List of files that failed to process")
+
+
+class AssignTaskResponse(BaseModel):
+    """Response after assigning a task from the most recent file."""
+    message_id: str = Field(..., description="ID of the created message")
+    conversation_id: str = Field(..., description="ID of the conversation")
+    filename: str = Field(..., description="Name of the processed file")
+    sender_agent: str = Field(..., description="Name of the agent that sent the message")
+    recipient_agent: str = Field(..., description="Name of the agent assigned to the task")
+    message_type: str = Field(..., description="Type of the created message")
+    created_at: Optional[str] = Field(None, description="Message creation timestamp (ISO format)")
+    content_preview: str = Field(..., description="Preview of the message content")
+    file_deleted: bool = Field(..., description="Whether the source file was deleted")
