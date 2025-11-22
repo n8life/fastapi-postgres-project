@@ -185,6 +185,14 @@ The application provides a comprehensive messaging system with the following ent
 #### CLI Command Execution (Feature 5)
 - `POST /cli/echo` - Echo a message to the command line via subprocess
 
+#### Issues File Processing (Feature 10 & 11)
+- `GET /issues/files` - List all files in the issues directory
+- `GET /issues/files/{filename}/content` - Get parsed content of a specific file
+- `POST /issues/process-file` - Process a specific file and create a message record
+- `POST /issues/process-all` - Process all files in the issues directory
+- `POST /issues/assign-task` - Assign task from most recent file to an agent (Feature 11)
+- `DELETE /issues/files/{filename}` - Delete a specific file from the issues directory
+
 #### API Examples
 
 **Create an Agent:**
@@ -277,6 +285,30 @@ curl -X POST http://localhost:8000/cli/echo \
   "message": "Hello from the API!",
   "output": "Hello from the API!",
   "error": null
+}
+```
+
+**Task Assignment from Issues Files:**
+```bash
+# List all files in the issues directory
+curl -X GET http://localhost:8000/issues/files \
+  -H "X-API-Key: your-api-key-here"
+
+# Process the most recent file and assign task to an agent
+curl -X POST http://localhost:8000/issues/assign-task \
+  -H "X-API-Key: your-api-key-here"
+
+# Response:
+{
+  "message_id": "uuid-here",
+  "conversation_id": "uuid-here",
+  "filename": "issue-file.txt",
+  "sender_agent": "task_assigner",
+  "recipient_agent": "agent-name",
+  "message_type": "task_assignment",
+  "created_at": "2025-11-22T03:38:53.222169+00:00",
+  "content_preview": "Processed file: issue-file.txt...",
+  "file_deleted": true
 }
 ```
 
@@ -476,6 +508,7 @@ Connects to a PostgreSQL database through an SSH tunnel for enhanced security.
 - `DB_POOL_SIZE`: Database connection pool size (default: 5)
 - `DB_MAX_OVERFLOW`: Maximum connection pool overflow (default: 10)
 - `SQLALCHEMY_ECHO`: Enable SQL query logging (`1`/`0`, default: 0)
+- `AGENT_NAME`: Name of the agent for task assignments (default: `task_assigner`)
 
 ## Security Features
 
