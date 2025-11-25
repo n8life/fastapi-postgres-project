@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi
+  namespace: fastapi-postgres
+  labels:
+    app: fastapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fastapi
+  template:
+    metadata:
+      labels:
+        app: fastapi
+    spec:
+      containers:
+        - name: fastapi
+          image: fastapi-postgres:latest
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 8000
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_DB
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)"
+            - name: API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: api-secret
+                  key: API_KEY
+            - name: REQUIRE_API_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: REQUIRE_API_KEY
+            - name: ENFORCE_HTTPS
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: ENFORCE_HTTPS
+            - name: AGENT_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: AGENT_NAME
+            - name: DB_POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: DB_POOL_SIZE
+            - name: DB_MAX_OVERFLOW
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: DB_MAX_OVERFLOW
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi
+  namespace: fastapi-postgres
+  labels:
+    app: fastapi
+spec:
+  type: NodePort
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+  selector:
+    app: fastapi

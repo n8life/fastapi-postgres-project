@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-config
+  namespace: fastapi-postgres
+  labels:
+    app: fastapi
+data:
+  REQUIRE_API_KEY: "true"
+  ENFORCE_HTTPS: "false"
+  AGENT_NAME: "task_assigner"
+  DB_POOL_SIZE: "5"
+  DB_MAX_OVERFLOW: "10"
