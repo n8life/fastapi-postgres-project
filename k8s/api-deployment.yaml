@@ -15,11 +15,19 @@ spec:
       labels:
         app: fastapi
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        fsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: fastapi
-          # Replace with your registry image: ghcr.io/your-org/fastapi-postgres:latest
-          image: fastapi-postgres:latest
-          imagePullPolicy: IfNotPresent
+          # Replace with your registry image: ghcr.io/your-org/fastapi-postgres:v1.0.0
+          image: fastapi-postgres:v1.0.0
+          imagePullPolicy: Always
           ports:
             - containerPort: 8000
           env:
@@ -91,10 +99,13 @@ spec:
             periodSeconds: 20
           securityContext:
             runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+            runAsUser: 10000
+            runAsGroup: 10000
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
 ---
 apiVersion: v1
 kind: Service
