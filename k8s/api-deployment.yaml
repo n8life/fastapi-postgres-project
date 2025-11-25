@@ -1,0 +1,134 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fastapi
+  namespace: fastapi-postgres
+  labels:
+    app: fastapi
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: fastapi
+  template:
+    metadata:
+      labels:
+        app: fastapi
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10000
+        runAsGroup: 10000
+        fsGroup: 10000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: fastapi
+          # IMPORTANT: Replace with your image digest after pushing to registry:
+          # docker inspect --format='{{index .RepoDigests 0}}' your-image:tag
+          # Example: ghcr.io/your-org/fastapi-postgres@sha256:abc123...
+          image: fastapi-postgres@sha256:REPLACE_WITH_YOUR_IMAGE_DIGEST
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8000
+          env:
+            # Secrets mounted as files for security - paths for application to read
+            - name: POSTGRES_USER_FILE
+              value: /secrets/postgres/POSTGRES_USER
+            - name: POSTGRES_PASSWORD_FILE
+              value: /secrets/postgres/POSTGRES_PASSWORD
+            - name: POSTGRES_DB_FILE
+              value: /secrets/postgres/POSTGRES_DB
+            - name: API_KEY_FILE
+              value: /secrets/api/API_KEY
+            # Database host for connection string construction
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: REQUIRE_API_KEY
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: REQUIRE_API_KEY
+            - name: ENFORCE_HTTPS
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: ENFORCE_HTTPS
+            - name: AGENT_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: AGENT_NAME
+            - name: DB_POOL_SIZE
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: DB_POOL_SIZE
+            - name: DB_MAX_OVERFLOW
+              valueFrom:
+                configMapKeyRef:
+                  name: api-config
+                  key: DB_MAX_OVERFLOW
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "500m"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          volumeMounts:
+            - name: postgres-secret-volume
+              mountPath: /secrets/postgres
+              readOnly: true
+            - name: api-secret-volume
+              mountPath: /secrets/api
+              readOnly: true
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10000
+            runAsGroup: 10000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: postgres-secret-volume
+          secret:
+            secretName: postgres-secret
+            defaultMode: 0400
+        - name: api-secret-volume
+          secret:
+            secretName: api-secret
+            defaultMode: 0400
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fastapi
+  namespace: fastapi-postgres
+  labels:
+    app: fastapi
+spec:
+  type: NodePort
+  ports:
+    - port: 8000
+      targetPort: 8000
+      nodePort: 30080
+  selector:
+    app: fastapi
