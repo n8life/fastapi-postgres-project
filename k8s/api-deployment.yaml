@@ -17,8 +17,9 @@ spec:
     spec:
       containers:
         - name: fastapi
+          # Replace with your registry image: ghcr.io/your-org/fastapi-postgres:latest
           image: fastapi-postgres:latest
-          imagePullPolicy: Never
+          imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8000
           env:

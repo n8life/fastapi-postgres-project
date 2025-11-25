@@ -24,23 +24,30 @@ export POSTGRES_DB="testdb"
 export API_KEY="your-secure-api-key"
 ```
 
-### 2. Build and Load the Docker Image
+### 2. Build and Push the Docker Image
 
-Build the FastAPI application image:
+Build and push the FastAPI application image to a registry accessible by your cluster:
 
 ```bash
 # Build the image
 docker build -t fastapi-postgres:latest .
 
 # For minikube: load image into minikube
-# minikube image load fastapi-postgres:latest
+minikube image load fastapi-postgres:latest
 
 # For kind: load image into kind
-# kind load docker-image fastapi-postgres:latest
+kind load docker-image fastapi-postgres:latest
 
-# For k3s or remote clusters: push to a registry
-# docker tag fastapi-postgres:latest your-registry/fastapi-postgres:latest
-# docker push your-registry/fastapi-postgres:latest
+# For remote clusters: push to a container registry
+# Option 1: GitHub Container Registry
+docker tag fastapi-postgres:latest ghcr.io/YOUR_ORG/fastapi-postgres:latest
+docker push ghcr.io/YOUR_ORG/fastapi-postgres:latest
+
+# Option 2: Docker Hub
+docker tag fastapi-postgres:latest YOUR_USER/fastapi-postgres:latest
+docker push YOUR_USER/fastapi-postgres:latest
+
+# Then update k8s/api-deployment.yaml to use your registry image
 ```
 
 ### 3. Create Namespace
