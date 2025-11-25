@@ -33,28 +33,20 @@ spec:
           ports:
             - containerPort: 8000
           env:
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_USER
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_PASSWORD
-            - name: POSTGRES_DB
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-secret
-                  key: POSTGRES_DB
-            - name: DATABASE_URL
-              value: "postgresql+asyncpg://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)"
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: api-secret
-                  key: API_KEY
+            # Secrets mounted as files for security - paths for application to read
+            - name: POSTGRES_USER_FILE
+              value: /secrets/postgres/POSTGRES_USER
+            - name: POSTGRES_PASSWORD_FILE
+              value: /secrets/postgres/POSTGRES_PASSWORD
+            - name: POSTGRES_DB_FILE
+              value: /secrets/postgres/POSTGRES_DB
+            - name: API_KEY_FILE
+              value: /secrets/api/API_KEY
+            # Database host for connection string construction
+            - name: POSTGRES_HOST
+              value: postgres
+            - name: POSTGRES_PORT
+              value: "5432"
             - name: REQUIRE_API_KEY
               valueFrom:
                 configMapKeyRef:
@@ -99,6 +91,13 @@ spec:
               port: 8000
             initialDelaySeconds: 15
             periodSeconds: 20
+          volumeMounts:
+            - name: postgres-secret-volume
+              mountPath: /secrets/postgres
+              readOnly: true
+            - name: api-secret-volume
+              mountPath: /secrets/api
+              readOnly: true
           securityContext:
             runAsNonRoot: true
             runAsUser: 10000
@@ -108,6 +107,15 @@ spec:
             capabilities:
               drop:
                 - ALL
+      volumes:
+        - name: postgres-secret-volume
+          secret:
+            secretName: postgres-secret
+            defaultMode: 0400
+        - name: api-secret-volume
+          secret:
+            secretName: api-secret
+            defaultMode: 0400
 ---
 apiVersion: v1
 kind: Service
