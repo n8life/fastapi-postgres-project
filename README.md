@@ -558,7 +558,9 @@ For production use, consider adding a proper migration system like Alembic.
 
 ## Deployment
 
-The application is containerized and ready for deployment with built-in health monitoring:
+The application is containerized and ready for deployment with built-in health monitoring.
+
+### Docker Compose
 
 ```bash
 # Build and run with Docker Compose
@@ -569,6 +571,39 @@ docker-compose ps
 
 # Scale the application
 docker-compose up --scale app=3
+```
+
+### Kubernetes
+
+The application includes Kubernetes manifests for production deployment. See [k8s/README.md](k8s/README.md) for detailed instructions.
+
+Quick start:
+
+```bash
+# Set required environment variables
+export POSTGRES_USER="postgres"
+export POSTGRES_PASSWORD="your-secure-password"
+export POSTGRES_DB="testdb"
+export API_KEY="your-secure-api-key"
+
+# Build the image
+docker build -t fastapi-postgres:latest .
+
+# Deploy to Kubernetes
+kubectl apply -f k8s/namespace.yaml
+kubectl create secret generic postgres-secret \
+  --from-literal=POSTGRES_USER=$POSTGRES_USER \
+  --from-literal=POSTGRES_PASSWORD=$POSTGRES_PASSWORD \
+  --from-literal=POSTGRES_DB=$POSTGRES_DB \
+  -n fastapi-postgres
+kubectl create secret generic api-secret \
+  --from-literal=API_KEY=$API_KEY \
+  -n fastapi-postgres
+kubectl apply -f k8s/configmap.yaml
+kubectl apply -f k8s/storage.yaml
+kubectl apply -f k8s/postgres-deployment.yaml
+kubectl apply -f k8s/api-deployment.yaml
+kubectl apply -f k8s/network-policies.yaml
 ```
 
 ### Health Monitoring
