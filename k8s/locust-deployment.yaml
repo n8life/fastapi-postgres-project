@@ -437,6 +437,16 @@ spec:
             capabilities:
               drop:
                 - ALL
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - "ps aux | grep '[l]ocust' || exit 1"
+            initialDelaySeconds: 10
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
       volumes:
         - name: locust-script
           configMap:
