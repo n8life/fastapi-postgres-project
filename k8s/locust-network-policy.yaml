@@ -1,0 +1,113 @@
+---
+# NetworkPolicy for Locust Master
+# Allows:
+# - Inbound: From workers and external access (NodePort)
+# - Outbound: To API service and workers
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: locust-master-netpol
+  namespace: fastapi-postgres
+  labels:
+    app: locust
+    role: master
+spec:
+  podSelector:
+    matchLabels:
+      app: locust
+      role: master
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow inbound from workers on port 5557
+    - from:
+        - podSelector:
+            matchLabels:
+              app: locust
+              role: worker
+      ports:
+        - protocol: TCP
+          port: 5557
+    # Allow external access to web UI on port 8089
+    - ports:
+        - protocol: TCP
+          port: 8089
+  egress:
+    # Allow outbound to FastAPI service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: fastapi
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow outbound to workers (for coordination)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: locust
+              role: worker
+
+---
+# NetworkPolicy for Locust Workers
+# Allows:
+# - Inbound: From master only
+# - Outbound: To master and API service
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: locust-worker-netpol
+  namespace: fastapi-postgres
+  labels:
+    app: locust
+    role: worker
+spec:
+  podSelector:
+    matchLabels:
+      app: locust
+      role: worker
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow inbound from master
+    - from:
+        - podSelector:
+            matchLabels:
+              app: locust
+              role: master
+  egress:
+    # Allow outbound to master on port 5557
+    - to:
+        - podSelector:
+            matchLabels:
+              app: locust
+              role: master
+      ports:
+        - protocol: TCP
+          port: 5557
+    # Allow outbound to FastAPI service
+    - to:
+        - podSelector:
+            matchLabels:
+              app: fastapi
+      ports:
+        - protocol: TCP
+          port: 8000
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53

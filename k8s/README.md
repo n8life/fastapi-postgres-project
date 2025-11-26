@@ -214,6 +214,86 @@ echo "Deployment complete!"
 kubectl get pods -n fastapi-postgres
 ```
 
+## Load Testing with Locust
+
+Deploy Locust for distributed load testing of the API.
+
+### Deploy Locust
+
+```bash
+# Deploy Locust master and workers
+kubectl apply -f k8s/locust-deployment.yaml
+
+# Verify deployment
+kubectl get pods -n fastapi-postgres -l app=locust
+
+# Expected output:
+# locust-master-xxx   1/1     Running
+# locust-worker-xxx   1/1     Running  (x2)
+```
+
+### Access Locust Web UI
+
+The Locust web UI is exposed via NodePort on port 30089.
+
+```bash
+# Get node IP
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+
+# Access web UI
+echo "Locust UI: http://$NODE_IP:30089"
+
+# Or use port-forward for local access
+kubectl port-forward -n fastapi-postgres svc/locust-master 8089:8089
+# Then open http://localhost:8089
+```
+
+### Configure and Run Tests
+
+1. Open the Locust web UI
+2. Set test parameters:
+   - **Number of users**: e.g., 100
+   - **Spawn rate**: e.g., 10 users/second
+   - **Host**: Pre-configured to `http://fastapi:8000`
+3. Click "Start swarming"
+4. Monitor results in real-time
+
+### Scale Locust Workers
+
+```bash
+# Scale to more workers for higher load
+kubectl scale deployment locust-worker -n fastapi-postgres --replicas=5
+
+# Verify workers in Locust UI
+```
+
+### Enable API Auto-scaling (Optional)
+
+Test how the API scales under load:
+
+```bash
+# Deploy Horizontal Pod Autoscaler
+kubectl apply -f k8s/hpa.yaml
+
+# Monitor HPA status
+kubectl get hpa -n fastapi-postgres
+
+# Watch pods scale
+kubectl get pods -n fastapi-postgres -l app=fastapi -w
+```
+
+The HPA will scale the API from 1-5 replicas based on CPU usage (target: 70%).
+
+### Stop Load Test
+
+```bash
+# Remove Locust deployment
+kubectl delete -f k8s/locust-deployment.yaml
+
+# Remove HPA (if deployed)
+kubectl delete -f k8s/hpa.yaml
+```
+
 ## Cleanup
 
 To remove all resources:
