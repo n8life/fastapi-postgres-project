@@ -22,8 +22,16 @@ data:
     from locust import HttpUser, task, between, TaskSet
 
 
-    # Get API key from environment variable
-    API_KEY = os.getenv("API_KEY", "************")
+    # Get API key from file (more secure than environment variable)
+    def get_api_key():
+        api_key_file = os.getenv("API_KEY_FILE")
+        if api_key_file and os.path.exists(api_key_file):
+            with open(api_key_file, 'r') as f:
+                return f.read().strip()
+        # Fallback to env var for local testing
+        return os.getenv("API_KEY", "************")
+    
+    API_KEY = get_api_key()
 
 
     class CoreEndpointTasks(TaskSet):
@@ -331,14 +339,14 @@ spec:
             - containerPort: 5557
               name: master-bind
           env:
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: api-secret
-                  key: API_KEY
+            - name: API_KEY_FILE
+              value: /secrets/api/API_KEY
           volumeMounts:
             - name: locust-script
               mountPath: /home/locust
+              readOnly: true
+            - name: api-secret-volume
+              mountPath: /secrets/api
               readOnly: true
           resources:
             requests:
@@ -372,6 +380,10 @@ spec:
         - name: locust-script
           configMap:
             name: locust-script
+        - name: api-secret-volume
+          secret:
+            secretName: api-secret
+            defaultMode: 0400
 
 ---
 # Locust Worker Deployment
@@ -412,14 +424,14 @@ spec:
             - --master-host=locust-master
             - --host=http://fastapi:8000
           env:
-            - name: API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: api-secret
-                  key: API_KEY
+            - name: API_KEY_FILE
+              value: /secrets/api/API_KEY
           volumeMounts:
             - name: locust-script
               mountPath: /home/locust
+              readOnly: true
+            - name: api-secret-volume
+              mountPath: /secrets/api
               readOnly: true
           resources:
             requests:
@@ -451,6 +463,10 @@ spec:
         - name: locust-script
           configMap:
             name: locust-script
+        - name: api-secret-volume
+          secret:
+            secretName: api-secret
+            defaultMode: 0400
 
 ---
 # Locust Master Service

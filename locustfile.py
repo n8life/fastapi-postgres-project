@@ -20,8 +20,17 @@ import random
 from locust import HttpUser, task, between, TaskSet
 
 
-# Get API key from environment variable
-API_KEY = os.getenv("API_KEY", "************")
+# Get API key from file (more secure than environment variable)
+def get_api_key():
+    api_key_file = os.getenv("API_KEY_FILE")
+    if api_key_file and os.path.exists(api_key_file):
+        with open(api_key_file, "r") as f:
+            return f.read().strip()
+    # Fallback to env var for local testing
+    return os.getenv("API_KEY", "************")
+
+
+API_KEY = get_api_key()
 
 
 class CoreEndpointTasks(TaskSet):
