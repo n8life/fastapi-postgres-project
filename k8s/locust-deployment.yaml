@@ -310,9 +310,18 @@ spec:
         app: locust
         role: master
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: locust
           image: locustio/locust:2.32.6
+          imagePullPolicy: Always
           args:
             - --master
             - --host=http://fastapi:8000
@@ -330,6 +339,7 @@ spec:
           volumeMounts:
             - name: locust-script
               mountPath: /home/locust
+              readOnly: true
           resources:
             requests:
               memory: "256Mi"
@@ -337,6 +347,27 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 8089
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 8089
+            initialDelaySeconds: 5
+            periodSeconds: 10
       volumes:
         - name: locust-script
           configMap:
@@ -364,9 +395,18 @@ spec:
         app: locust
         role: worker
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        runAsGroup: 65534
+        fsGroup: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: locust
           image: locustio/locust:2.32.6
+          imagePullPolicy: Always
           args:
             - --worker
             - --master-host=locust-master
@@ -380,6 +420,7 @@ spec:
           volumeMounts:
             - name: locust-script
               mountPath: /home/locust
+              readOnly: true
           resources:
             requests:
               memory: "256Mi"
@@ -387,6 +428,15 @@ spec:
             limits:
               memory: "512Mi"
               cpu: "500m"
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
       volumes:
         - name: locust-script
           configMap:
