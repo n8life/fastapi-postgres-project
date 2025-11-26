@@ -614,6 +614,202 @@ The Docker container includes a built-in healthcheck that:
 - Waits 5 seconds before starting checks
 - Marks container unhealthy after 3 consecutive failures
 
+## Load Testing
+
+The application includes comprehensive load testing capabilities using [Locust](https://locust.io), a modern load testing framework.
+
+### Features
+
+- **Comprehensive Coverage**: Tests all 30+ API endpoints across all routers
+- **Realistic Traffic Patterns**: Weighted tasks simulate real-world usage
+- **Distributed Testing**: Master-worker architecture for high load generation
+- **Kubernetes Integration**: Deploy Locust directly to your cluster
+- **Auto-scaling Support**: Optional HPA configuration to test scaling behavior
+
+### Local Load Testing
+
+#### Prerequisites
+
+```bash
+# Install locust
+uv sync
+
+# Set API key
+export API_KEY="your-api-key-here"
+```
+
+#### Run Tests Locally
+
+```bash
+# Start locust with web UI
+uv run locust -f locustfile.py --host=http://localhost:8000
+
+# Open browser to http://localhost:8089
+# Configure number of users and spawn rate
+# Click "Start swarming" to begin test
+```
+
+#### Headless Testing
+
+```bash
+# Run without web UI
+uv run locust -f locustfile.py --host=http://localhost:8000 \
+  --headless --users 10 --spawn-rate 2 --run-time 1m
+
+# View results in terminal
+```
+
+### Kubernetes Load Testing
+
+Deploy Locust to your Kubernetes cluster for distributed load testing.
+
+#### Deploy Locust
+
+```bash
+# Ensure API is deployed and API secret exists
+kubectl apply -f k8s/locust-deployment.yaml
+
+# Verify deployment
+kubectl get pods -n fastapi-postgres -l app=locust
+
+# Expected output:
+# locust-master-xxx   1/1     Running
+# locust-worker-xxx   1/1     Running
+# locust-worker-xxx   1/1     Running
+```
+
+#### Access Locust Web UI
+
+```bash
+# Get node IP
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+
+# Access Locust web UI
+open http://$NODE_IP:30089
+
+# Or for local clusters (minikube/kind)
+kubectl port-forward -n fastapi-postgres svc/locust-master 8089:8089
+open http://localhost:8089
+```
+
+#### Configure Test Parameters
+
+1. **Number of users**: Total number of simulated users (e.g., 100)
+2. **Spawn rate**: Users to add per second (e.g., 10)
+3. **Host**: Pre-configured to target the FastAPI service
+
+#### Scale Workers
+
+```bash
+# Scale to more workers for higher load
+kubectl scale deployment locust-worker -n fastapi-postgres --replicas=5
+
+# Check worker status in web UI
+```
+
+### Enable Auto-scaling (Optional)
+
+Deploy HPA to test how the API scales under load:
+
+```bash
+# Deploy Horizontal Pod Autoscaler
+kubectl apply -f k8s/hpa.yaml
+
+# Monitor scaling
+kubectl get hpa -n fastapi-postgres -w
+
+# Watch pods scale up/down
+kubectl get pods -n fastapi-postgres -l app=fastapi -w
+```
+
+The HPA configuration:
+- **Min replicas**: 1
+- **Max replicas**: 5
+- **Target CPU**: 70%
+- **Scale up**: Immediate (adds 2 pods or 100% every 30s)
+- **Scale down**: Gradual (50% reduction after 5 min stabilization)
+
+### Interpreting Results
+
+The Locust web UI provides:
+
+1. **Statistics Table**:
+   - Request counts and failure rates per endpoint
+   - Response times (min, max, average, percentiles)
+   - Requests per second (RPS)
+
+2. **Charts Tab**:
+   - Total requests per second over time
+   - Response time percentiles (50th, 95th, 99th)
+   - Number of active users
+
+3. **Failures Tab**:
+   - Detailed error messages
+   - Stack traces for debugging
+
+4. **Download Data**:
+   - Export statistics to CSV
+   - Download full request logs
+
+### Load Test Scenarios
+
+#### 1. Basic Health Check
+
+```bash
+# Test with minimal load
+uv run locust -f locustfile.py --host=http://localhost:8000 \
+  --headless --users 5 --spawn-rate 1 --run-time 30s
+```
+
+#### 2. Steady State Load
+
+```bash
+# Sustained moderate load
+uv run locust -f locustfile.py --host=http://localhost:8000 \
+  --headless --users 50 --spawn-rate 5 --run-time 5m
+```
+
+#### 3. Spike Test
+
+```bash
+# Rapid user ramp-up
+uv run locust -f locustfile.py --host=http://localhost:8000 \
+  --headless --users 200 --spawn-rate 50 --run-time 2m
+```
+
+#### 4. Soak Test
+
+```bash
+# Long-running stability test
+uv run locust -f locustfile.py --host=http://localhost:8000 \
+  --headless --users 30 --spawn-rate 3 --run-time 30m
+```
+
+### Cleanup
+
+```bash
+# Remove Locust deployment
+kubectl delete -f k8s/locust-deployment.yaml
+
+# Remove HPA
+kubectl delete -f k8s/hpa.yaml
+```
+
+### Traffic Pattern Details
+
+The locustfile simulates realistic API usage:
+
+- **Core Endpoints (40% weight)**: Health checks and root endpoint
+- **Messaging (35% weight)**: Agent and message operations, most common
+- **Issues (15% weight)**: File operations, moderate frequency
+- **CLI (5% weight)**: Command execution, infrequent
+- **S3 (5% weight)**: S3 operations, infrequent
+
+Each task group has internal weights for individual operations:
+- Reads > Writes (realistic for most APIs)
+- Health checks very frequent (monitoring simulation)
+- Creates before updates/deletes (proper test data flow)
+
 ## License
 
 MIT License
