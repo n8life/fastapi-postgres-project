@@ -320,7 +320,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: locust
-          image: locustio/locust:2.32.6
+          image: locustio/locust@sha256:99278f4b23e2353e7a93b84f9c270700c8193b90c1611f5c2a1817a111c22ee3
           imagePullPolicy: Always
           args:
             - --master
@@ -405,7 +405,7 @@ spec:
           type: RuntimeDefault
       containers:
         - name: locust
-          image: locustio/locust:2.32.6
+          image: locustio/locust@sha256:99278f4b23e2353e7a93b84f9c270700c8193b90c1611f5c2a1817a111c22ee3
           imagePullPolicy: Always
           args:
             - --worker
