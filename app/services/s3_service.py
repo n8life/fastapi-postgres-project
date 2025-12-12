@@ -84,7 +84,8 @@ class S3Service:
             elif error_code == 'NoSuchBucket':
                 raise FileNotFoundError(f"S3 bucket '{self.s3_bucket_name}' not found") from e
             else:
-                raise ClientError(f"S3 operation failed: {e.response['Error']['Message']}", e.response['Error']) from e
+                # Re-raise the original botocore ClientError to preserve structure
+                raise e
                 
         except NoCredentialsError as e:
             raise NoCredentialsError("AWS credentials not found or invalid") from e

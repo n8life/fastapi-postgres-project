@@ -17,15 +17,23 @@ async def get_api_key(api_key: Optional[str] = Depends(api_key_header)) -> str:
     """
     Validates the API key from the X-API-Key header.
     
+    If REQUIRE_API_KEY is set to "false", this function will allow requests without
+    an API key (useful for local testing), preserving security in other environments.
+    
     Args:
         api_key: The API key from the header
         
     Returns:
-        str: The validated API key
+        str: The validated API key or an empty string when API key enforcement is disabled
         
     Raises:
-        HTTPException: If API key is missing or invalid
+        HTTPException: If API key is missing or invalid while enforcement is enabled
     """
+    require_api_key = os.getenv("REQUIRE_API_KEY", "true").lower() == "true"
+    if not require_api_key:
+        # Auth disabled (e.g., tests); return a benign value
+        return api_key or ""
+
     if not api_key:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
