@@ -4,6 +4,15 @@ import pytest
 # Ensure pytest-asyncio plugin is loaded
 pytest_plugins = ("pytest_asyncio",)
 
+# Auto-mark any async test functions with @pytest.mark.asyncio
+def pytest_collection_modifyitems(items):
+    import inspect
+    import pytest as _pytest
+    for item in items:
+        func = getattr(item, "function", None)
+        if func and inspect.iscoroutinefunction(func):
+            item.add_marker(_pytest.mark.asyncio)
+
 @pytest.fixture(scope="session", autouse=True)
 def _set_test_env():
     # Disable API key enforcement and HTTPS redirects in tests
