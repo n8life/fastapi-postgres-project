@@ -23,6 +23,19 @@ def pytest_collection_modifyitems(items):
                 item.add_marker(_pytest.mark.anyio)
             if not item.get_closest_marker("asyncio"):
                 item.add_marker(_pytest.mark.asyncio)
+            # As a last resort, wrap the function to run the coroutine ourselves
+            import asyncio
+            obj = getattr(item, "obj", None)
+            wrapped = getattr(obj, "__wrapped__", None)
+            target = wrapped or obj
+            try:
+                import inspect
+                if target and inspect.iscoroutinefunction(target):
+                    def _sync_wrapper(**kwargs):
+                        return asyncio.run(target(**kwargs))
+                    item.obj = _sync_wrapper
+            except Exception:
+                pass
 
 # Fallback: run coroutine tests manually if plugin didn't intercept
 def pytest_pyfunc_call(pyfuncitem):
