@@ -78,8 +78,9 @@ class S3Service:
             }
             
         except ClientError as e:
-            error_code = e.response['Error']['Code']
-            if error_code == 'NoSuchKey':
+            error_code = str(e.response.get('Error', {}).get('Code'))
+            not_found_codes = {'NoSuchKey', 'NotFound', '404'}
+            if error_code in not_found_codes:
                 raise FileNotFoundError(f"File '{s3_filename}' not found in S3 bucket '{self.s3_bucket_name}'") from e
             elif error_code == 'NoSuchBucket':
                 raise FileNotFoundError(f"S3 bucket '{self.s3_bucket_name}' not found") from e
