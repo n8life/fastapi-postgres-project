@@ -52,7 +52,7 @@ class MessageBase(BaseModel):
 
 
 class MessageCreate(MessageBase):
-    pass
+    schedule_at: Optional[datetime] = Field(None, description="Schedule message to be sent at this time")
 
 
 class MessageUpdate(BaseModel):

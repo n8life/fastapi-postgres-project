@@ -3,7 +3,7 @@ from typing import List
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, status, Depends
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import select, and_, or_, update
+from sqlalchemy import select, and_, or_, update, func
 
 from ..database import db_manager
 from ..schemas.messaging import (
@@ -14,7 +14,7 @@ from ..schemas.messaging import (
     MessageWithRecipientInfo, MessageMetadataWithAgent, MarkAsReadRequest, MarkAsReadResponse,
     ConversationCreate, ConversationUpdate, ConversationRead, ConversationWithMessages,
 )
-from ..models.messaging import Agent, Message, MessageRecipient, AgentMessageMetadata, Conversation
+from ..models.messaging import Agent, Message, MessageRecipient, AgentMessageMetadata, Conversation, TimedMessage
 from ..security import get_api_key
 
 
@@ -73,8 +73,18 @@ async def create_message(payload: MessageCreate, api_key: str = Depends(get_api_
     """Create a new message"""
     async with db_manager.get_connection() as session:
         try:
-            message = Message(**payload.model_dump())
+            # Extract schedule_at before creating message
+            message_data = payload.model_dump()
+            schedule_at = message_data.pop("schedule_at", None)
+            
+            message = Message(**message_data)
             session.add(message)
+            await session.flush()  # flush to get message.id
+            
+            if schedule_at:
+                timed_msg = TimedMessage(message_id=message.id, send_at=schedule_at)
+                session.add(timed_msg)
+                
             await session.commit()
             await session.refresh(message)
             return message
@@ -211,6 +221,14 @@ async def get_all_messages_for_agent(agent_id: UUID, api_key: str = Depends(get_
                 Message.id == MessageRecipient.message_id,
                 MessageRecipient.recipient_id == agent_id
             )
+        ).outerjoin(
+            TimedMessage,
+            Message.id == TimedMessage.message_id
+        ).where(
+            or_(
+                TimedMessage.message_id.is_(None),
+                TimedMessage.send_at <= func.now()
+            )
         ).order_by(Message.sent_at.desc())
         
         result = await session.execute(stmt)
@@ -256,10 +274,17 @@ async def get_unread_messages_for_agent(agent_id: UUID, api_key: str = Depends(g
                 Message.id == MessageRecipient.message_id,
                 MessageRecipient.recipient_id == agent_id
             )
+        ).outerjoin(
+            TimedMessage,
+            Message.id == TimedMessage.message_id
         ).where(
             and_(
                 MessageRecipient.recipient_id == agent_id,
-                or_(MessageRecipient.is_read == False, MessageRecipient.is_read.is_(None))
+                or_(MessageRecipient.is_read == False, MessageRecipient.is_read.is_(None)),
+                or_(
+                    TimedMessage.message_id.is_(None),
+                    TimedMessage.send_at <= func.now()
+                )
             )
         ).order_by(Message.sent_at.desc())
         
