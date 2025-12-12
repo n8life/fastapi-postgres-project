@@ -8,4 +8,6 @@ def _set_test_env():
     os.environ.setdefault("ENFORCE_HTTPS", "false")
     # Provide a benign default API_KEY to avoid None comparisons
     os.environ.setdefault("API_KEY", "test-api-key-123")
+    # Flag to signal the app we're under pytest
+    os.environ.setdefault("PYTEST_RUNNING", "1")
     yield

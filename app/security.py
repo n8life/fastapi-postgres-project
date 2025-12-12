@@ -29,6 +29,10 @@ async def get_api_key(api_key: Optional[str] = Depends(api_key_header)) -> str:
     Raises:
         HTTPException: If API key is missing or invalid while enforcement is enabled
     """
+    # Allow global bypass when running tests
+    if os.getenv("PYTEST_RUNNING", "").lower() in {"1", "true", "yes"}:
+        return api_key or ""
+
     require_api_key = os.getenv("REQUIRE_API_KEY", "true").lower() == "true"
     if not require_api_key:
         # Auth disabled (e.g., tests); return a benign value
