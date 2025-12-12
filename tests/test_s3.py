@@ -251,7 +251,6 @@ class TestS3Endpoints:
     pytestmark = pytest.mark.anyio
     """Test cases for S3 API endpoints."""
     
-    @mock_aws
     @patch('app.routers.s3.s3_service')
     async def test_pull_file_endpoint_success(self, mock_service, client):
         """Test successful file pull endpoint"""
