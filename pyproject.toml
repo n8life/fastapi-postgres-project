@@ -25,4 +25,5 @@ dev = [
     "ruff>=0.7.0",
     "pylint>=3.0.0",
     "locust>=2.32.0",
+    "pytest-anyio>=0.0.0",
 ]
