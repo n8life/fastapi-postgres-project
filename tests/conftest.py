@@ -17,6 +17,9 @@ def pytest_collection_modifyitems(items):
         is_coro = (func and inspect.iscoroutinefunction(func)) or (target and inspect.iscoroutinefunction(target))
         if is_coro and not item.get_closest_marker("asyncio"):
             item.add_marker(_pytest.mark.asyncio)
+        # Targeted fallback for stubborn patched test
+        if "tests/test_s3.py::TestS3Endpoints::test_pull_file_endpoint_success" in item.nodeid and not item.get_closest_marker("asyncio"):
+            item.add_marker(_pytest.mark.asyncio)
 
 # Fallback: run coroutine tests manually if plugin didn't intercept
 def pytest_pyfunc_call(pyfuncitem):
