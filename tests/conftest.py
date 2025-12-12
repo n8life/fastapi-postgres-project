@@ -1,6 +1,9 @@
 import os
 import pytest
 
+# Ensure pytest-asyncio plugin is loaded
+pytest_plugins = ("pytest_asyncio",)
+
 @pytest.fixture(scope="session", autouse=True)
 def _set_test_env():
     # Disable API key enforcement and HTTPS redirects in tests
