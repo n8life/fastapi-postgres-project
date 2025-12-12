@@ -2,7 +2,7 @@
 
 ## Process
 - run git pull main
-- run git branch -b "feature-9/read-issue-files" from main
+- run git branch -b "<feature-#>/<short-feature-description>" from main
 - run source @set_env.sh 
 - complete all Tasks
 - regress test in docker-compose
