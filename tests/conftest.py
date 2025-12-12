@@ -15,6 +15,23 @@ def pytest_collection_modifyitems(items):
         if is_coro and not item.get_closest_marker("asyncio"):
             item.add_marker(_pytest.mark.asyncio)
 
+# Fallback: run coroutine tests manually if plugin didn't intercept
+def pytest_pyfunc_call(pyfuncitem):
+    import inspect, asyncio
+    testfunc = pyfuncitem.obj
+    if inspect.iscoroutinefunction(testfunc):
+        loop = asyncio.new_event_loop()
+        try:
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(testfunc(**pyfuncitem.funcargs))
+        finally:
+            try:
+                loop.run_until_complete(loop.shutdown_asyncgens())
+            finally:
+                asyncio.set_event_loop(None)
+                loop.close()
+        return True
+
 @pytest.fixture(scope="session", autouse=True)
 def _set_test_env():
     # Disable API key enforcement and HTTPS redirects in tests
