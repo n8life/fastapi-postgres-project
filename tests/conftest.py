@@ -10,7 +10,9 @@ def pytest_collection_modifyitems(items):
     import pytest as _pytest
     for item in items:
         func = getattr(item, "function", None)
-        if func and inspect.iscoroutinefunction(func):
+        obj = getattr(item, "obj", None)
+        is_coro = (func and inspect.iscoroutinefunction(func)) or (obj and inspect.iscoroutinefunction(obj))
+        if is_coro and not item.get_closest_marker("asyncio"):
             item.add_marker(_pytest.mark.asyncio)
 
 @pytest.fixture(scope="session", autouse=True)
