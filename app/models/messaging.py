@@ -119,6 +119,12 @@ class Message(Base):
         "Conversation", 
         back_populates="messages"
     )
+    timed_message: Mapped[Optional["TimedMessage"]] = relationship(
+        "TimedMessage",
+        back_populates="message",
+        cascade="all, delete-orphan",
+        uselist=False
+    )
 
 
 class MessageRecipient(Base):
@@ -176,4 +182,24 @@ class AgentMessageMetadata(Base):
     message: Mapped[Optional["Message"]] = relationship(
         "Message", 
         back_populates="metadata_items"
+    )
+
+
+class TimedMessage(Base):
+    __tablename__ = "timed_messages"
+
+    message_id: Mapped[uuid.UUID] = mapped_column(
+        PG_UUID(as_uuid=True), 
+        ForeignKey("messages.id"),
+        primary_key=True
+    )
+    send_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), 
+        nullable=False
+    )
+
+    # Relationships
+    message: Mapped["Message"] = relationship(
+        "Message", 
+        back_populates="timed_message"
     )
