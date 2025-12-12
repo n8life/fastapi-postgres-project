@@ -8,15 +8,6 @@ from app.main import app
 from app.database import db_manager
 
 
-@pytest_asyncio.fixture
-async def client():
-    """Create test client"""
-    from httpx import ASGITransport
-    async with AsyncClient(
-        transport=ASGITransport(app=app), 
-        base_url="http://test"
-    ) as ac:
-        yield ac
 
 
 @pytest_asyncio.fixture(autouse=True)

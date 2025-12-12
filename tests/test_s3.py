@@ -16,20 +16,6 @@ from app.database import db_manager
 from app.services.s3_service import S3Service
 
 
-@pytest_asyncio.fixture
-async def client():
-    """Create test client with API key authentication"""
-    # Set up test environment
-    os.environ["API_KEY"] = "test-api-key-123"
-    os.environ["ENFORCE_HTTPS"] = "false"
-    
-    headers = {"X-API-Key": "test-api-key-123"}
-    async with AsyncClient(
-        transport=ASGITransport(app=app), 
-        base_url="http://test",
-        headers=headers
-    ) as ac:
-        yield ac
 
 
 @pytest_asyncio.fixture(autouse=True)

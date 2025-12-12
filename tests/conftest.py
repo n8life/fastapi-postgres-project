@@ -1,5 +1,7 @@
 import os
 import pytest
+import pytest_asyncio
+from httpx import AsyncClient, ASGITransport
 
 # Ensure pytest-asyncio plugin is loaded
 pytest_plugins = ("pytest_asyncio",)
@@ -17,25 +19,6 @@ def pytest_collection_modifyitems(items):
         is_coro = (func and inspect.iscoroutinefunction(func)) or (target and inspect.iscoroutinefunction(target))
         if is_coro and not item.get_closest_marker("asyncio"):
             item.add_marker(_pytest.mark.asyncio)
-        # Targeted fallback for all methods in TestS3Endpoints
-        if item.nodeid.startswith("tests/test_s3.py::TestS3Endpoints::"):
-            if not item.get_closest_marker("anyio"):
-                item.add_marker(_pytest.mark.anyio)
-            if not item.get_closest_marker("asyncio"):
-                item.add_marker(_pytest.mark.asyncio)
-            # As a last resort, wrap the function to run the coroutine ourselves
-            import asyncio
-            obj = getattr(item, "obj", None)
-            wrapped = getattr(obj, "__wrapped__", None)
-            target = wrapped or obj
-            try:
-                import inspect
-                if target and inspect.iscoroutinefunction(target):
-                    def _sync_wrapper(**kwargs):
-                        return asyncio.run(target(**kwargs))
-                    item.obj = _sync_wrapper
-            except Exception:
-                pass
 
 # Fallback: run coroutine tests manually if plugin didn't intercept
 def pytest_pyfunc_call(pyfuncitem):
@@ -57,12 +40,12 @@ def pytest_pyfunc_call(pyfuncitem):
 @pytest.fixture(scope="session", autouse=True)
 def _set_test_env():
     # Disable API key enforcement and HTTPS redirects in tests
-    os.environ.setdefault("REQUIRE_API_KEY", "false")
-    os.environ.setdefault("ENFORCE_HTTPS", "false")
+    os.environ["REQUIRE_API_KEY"] = "false"
+    os.environ["ENFORCE_HTTPS"] = "false"
     # Provide a benign default API_KEY to avoid None comparisons
-    os.environ.setdefault("API_KEY", "test-api-key-123")
+    os.environ["API_KEY"] = "test-api-key-123"
     # Flag to signal the app we're under pytest
-    os.environ.setdefault("PYTEST_RUNNING", "1")
+    os.environ["PYTEST_RUNNING"] = "1"
 
     # Apply FastAPI dependency override so routes skip auth in tests
     try:
@@ -74,3 +57,18 @@ def _set_test_env():
         pass
 
     yield
+
+@pytest_asyncio.fixture
+async def client():
+    """Create test client with API key authentication"""
+    from app.main import app
+    
+    # Ensure API key is set in headers even if env var override works, to be safe
+    headers = {"X-API-Key": "test-api-key-123"}
+    
+    async with AsyncClient(
+        transport=ASGITransport(app=app), 
+        base_url="http://test",
+        headers=headers
+    ) as ac:
+        yield ac
