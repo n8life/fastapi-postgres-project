@@ -248,6 +248,7 @@ class TestS3Service:
 
 
 class TestS3Endpoints:
+    pytestmark = pytest.mark.anyio
     """Test cases for S3 API endpoints."""
     
     @mock_aws
