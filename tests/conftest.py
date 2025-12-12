@@ -11,7 +11,10 @@ def pytest_collection_modifyitems(items):
     for item in items:
         func = getattr(item, "function", None)
         obj = getattr(item, "obj", None)
-        is_coro = (func and inspect.iscoroutinefunction(func)) or (obj and inspect.iscoroutinefunction(obj))
+        # unwrap patched functions
+        wrapped = getattr(obj, "__wrapped__", None)
+        target = wrapped or obj
+        is_coro = (func and inspect.iscoroutinefunction(func)) or (target and inspect.iscoroutinefunction(target))
         if is_coro and not item.get_closest_marker("asyncio"):
             item.add_marker(_pytest.mark.asyncio)
 
