@@ -4,12 +4,23 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from botocore.exceptions import ClientError, NoCredentialsError
+from fastapi.security import APIKeyHeader
+import os
 
 from ..security import get_api_key
 from ..services.s3_service import s3_service
 
 
 router = APIRouter(prefix="/s3", tags=["s3"])
+
+# Strict auth just for S3 endpoints: always require API key even in tests
+_strict_header = APIKeyHeader(name="X-API-Key", auto_error=True)
+
+def strict_api_key(api_key: str = Depends(_strict_header)) -> str:
+    expected = os.getenv("API_KEY", "************")
+    if api_key != expected:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    return api_key
 
 
 class PullFileRequest(BaseModel):
@@ -46,7 +57,7 @@ class FileListResponse(BaseModel):
 @router.post("/pull-file", response_model=PullFileResponse)
 async def pull_file_from_s3(
     request: PullFileRequest,
-    api_key: str = Depends(get_api_key)
+    api_key: str = Depends(strong_auth := strict_api_key)
 ) -> PullFileResponse:
     """
     Pull a file from S3 bucket and save it to issues folder with UUID-based name.
@@ -90,7 +101,7 @@ async def pull_file_from_s3(
 
 @router.get("/latest-file", response_model=LatestFileResponse)
 async def get_latest_file_content(
-    api_key: str = Depends(get_api_key)
+    api_key: str = Depends(strict_api_key)
 ) -> LatestFileResponse:
     """
     Read and return the content of the latest file from issues folder.
@@ -125,7 +136,7 @@ async def get_latest_file_content(
 
 @router.get("/files", response_model=FileListResponse)
 async def list_files(
-    api_key: str = Depends(get_api_key)
+    api_key: str = Depends(strict_api_key)
 ) -> FileListResponse:
     """
     List all files in the issues folder.
